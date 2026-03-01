@@ -20,7 +20,7 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
   return (
     <div className="fixed inset-0 z-[300] bg-black/98 backdrop-blur-3xl flex flex-col items-center justify-center p-4 overflow-hidden font-sans print:p-0">
       
-      {/* 🌌 Ambient Background Layer */}
+      {/* 🌌 Background Ambience */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20 print:hidden">
         {[...Array(2)].map((_, i) => (
           <motion.div
@@ -38,7 +38,7 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
         animate={{ y: 0, opacity: 1 }}
         className="relative w-full max-w-[340px] bg-[#020402]/90 border border-white/20 rounded-[45px] shadow-[0_0_120px_rgba(16,185,129,0.1)] overflow-hidden print:border-none print:shadow-none backdrop-blur-3xl"
       >
-        {/* 💵 MAX-ILLUMINATED WATERMARKS: გაცილებით დიდი და კაშკაშა */}
+        {/* 💵 Bold Phosphorescent Watermarks */}
         <div className="absolute inset-0 opacity-[0.25] pointer-events-none flex flex-wrap gap-x-16 gap-y-14 p-4 rotate-[20deg] z-0 justify-center">
             {[...Array(18)].map((_, i) => (
                 <motion.span 
@@ -48,7 +48,7 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
                     scale: [1, 1.1, 1],
                     textShadow: ["0 0 10px #10b981", "0 0 25px #10b981", "0 0 10px #10b981"]
                   }}
-                  transition={{ duration: Math.random() * 2 + 1, repeat: Infinity }}
+                  transition={{ duration: Math.random() * 3 + 2, repeat: Infinity }}
                   className="text-[14px] font-black italic tracking-[0.3em] select-none uppercase text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,1)]"
                 >
                   InfluXpay
@@ -69,68 +69,63 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
         </div>
 
         <div className="p-6 space-y-6 relative z-10">
-          {/* 🔴 MERCHANT PROOF: THE QUANTUM CORE */}
+          {/* 🔴 MERCHANT PROOF: THE SINGULARITY CORE */}
           <div className="text-center py-5 bg-red-500/[0.03] rounded-[30px] border border-red-500/20 relative overflow-hidden flex items-center justify-center gap-2">
             <div className="flex flex-col flex-1 pl-2">
               <span className="text-[8px] font-black text-red-500/50 uppercase tracking-[0.6em] block mb-1 italic text-left ml-4">Gross Input</span>
-              <h3 className="text-5xl font-black tracking-tighter text-red-500 italic leading-none">
+              <h3 className="text-5xl font-black tracking-tighter text-red-500 italic leading-none opacity-60">
                 {originalAmount?.toFixed(2)}
               </h3>
             </div>
 
-            {/* 🪐 HIGH-BUDGET QUANTUM CORE ANIMATION */}
+            {/* 🪐 SINGULARITY CORE: Gemini Custom Design */}
             <div className="relative h-20 w-20 flex items-center justify-center mr-1 overflow-hidden scale-110">
-              {/* Outer Energy Shells */}
-              <motion.div animate={{ rotate: 360, scale: [1, 1.2, 1] }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }} className="absolute h-[90%] w-[90%] border-[0.5px] border-red-500/20 rounded-full" />
-              <motion.div animate={{ rotate: -360, scale: [1.2, 1, 1.2] }} transition={{ duration: 6, repeat: Infinity, ease: "linear" }} className="absolute h-[70%] w-[70%] border-[0.5px] border-red-400/10 rounded-full" />
+              {/* Event Horizon Rings */}
+              <motion.div animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }} className="absolute h-[95%] w-[95%] border-t-[1.5px] border-red-500/40 rounded-full" />
+              <motion.div animate={{ rotate: -360 }} transition={{ duration: 5, repeat: Infinity, ease: "linear" }} className="absolute h-[75%] w-[75%] border-b-[1px] border-white/20 rounded-full" />
               
-              {/* 3D Infinity Nebula of Points */}
+              {/* Infinite Particle Nebula */}
               <motion.div 
-                animate={{ rotateY: 360, rotateX: 360, rotateZ: 360 }} 
-                transition={{ duration: 8, repeat: Infinity, ease: "linear" }} 
+                animate={{ rotateY: 360, rotateZ: 360 }} 
+                transition={{ duration: 10, repeat: Infinity, ease: "linear" }} 
                 className="absolute h-full w-full rounded-full"
                 style={{ transformStyle: 'preserve-3d' }}
               >
-                  {[...Array(40)].map((_, i) => (
+                  {[...Array(30)].map((_, i) => (
                     <motion.div 
                       key={i}
-                      animate={{ 
-                        opacity: [0.2, 1, 0.2],
-                        scale: [1, 1.5, 1]
-                      }}
-                      transition={{ duration: Math.random() * 2 + 1, repeat: Infinity }}
-                      className="absolute h-[1.2px] w-[1.2px] bg-white rounded-full shadow-[0_0_8px_white]"
+                      animate={{ scale: [0, 1.2, 0], opacity: [0, 1, 0] }}
+                      transition={{ duration: Math.random() * 2 + 1, repeat: Infinity, delay: Math.random() }}
+                      className="absolute h-[1px] w-[1px] bg-white rounded-full"
                       style={{ 
                         top: `${Math.random() * 100}%`, 
                         left: `${Math.random() * 100}%`,
-                        transform: `translateZ(${Math.random() * 60 - 30}px)`
+                        transform: `translateZ(${Math.random() * 40 - 20}px)`
                       }}
                     />
                   ))}
               </motion.div>
 
-              {/* Central Pulsating Core */}
-              <div className="absolute h-5 w-5 bg-red-600 rounded-full blur-[12px] opacity-40 animate-pulse" />
-              <div className="h-3 w-3 rounded-full bg-red-500 shadow-[0_0_25px_10px_rgba(239,68,68,1)] z-10" />
-              
-              {/* Event Horizon Ring */}
-              <motion.div 
-                animate={{ rotate: 360 }} 
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className="absolute h-full w-full border-t border-red-500/40 rounded-full"
-              />
+              {/* Gravity Well (Black Core) */}
+              <div className="absolute h-6 w-6 bg-black rounded-full shadow-[0_0_20px_2px_rgba(239,68,68,0.4)] border border-red-500/20 z-10 flex items-center justify-center">
+                 <div className="h-1 w-1 bg-red-500 rounded-full animate-ping" />
+              </div>
             </div>
           </div>
 
-          {/* ⚪ PURE WHITE: FINAL SETTLE */}
-          <div className="text-center relative">
-            <span className="text-[8px] font-black text-white/40 uppercase tracking-[1em] block mb-1 italic">Settled Matrix</span>
-            <h2 className="text-7xl font-black tracking-tighter text-white italic leading-none drop-shadow-[0_0_25px_rgba(255,255,255,0.1)]">
+          {/* ⚪ THE SETTLED MATRIX: SEXY NEON STYLE */}
+          <div className="text-center relative py-2">
+            <span className="text-[8px] font-black text-white/30 uppercase tracking-[1.2em] block mb-2 italic">Settled Matrix</span>
+            <motion.h2 
+              animate={{ textShadow: ["0 0 10px #fff", "0 0 30px #fff", "0 0 10px #fff"] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="text-8xl font-black tracking-tighter text-white italic leading-none drop-shadow-[0_10px_20px_rgba(255,255,255,0.2)]"
+            >
               {total.toFixed(2)}
-            </h2>
-            <div className="flex items-center justify-center gap-2 mt-3">
-              <div className="h-1 w-1 rounded-full bg-emerald-500 animate-ping" />
-              <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.5em] italic leading-none">GEL Verified</span>
+            </motion.h2>
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981] animate-pulse" />
+              <span className="text-[10px] font-black text-emerald-500/60 uppercase tracking-[0.6em] italic leading-none">GEL Secure</span>
             </div>
           </div>
 
