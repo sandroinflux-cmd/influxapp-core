@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation' // 🚀 დავამატეთ ნავიგაცია
+import { useRouter } from 'next/navigation' // 🚀 დამატებულია ნავიგაციისთვის
 
 export default function AuthPage() {
   const router = useRouter() // 🚀 ინიციალიზაცია
@@ -16,10 +16,10 @@ export default function AuthPage() {
   const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // ინფლუენსერის პირდაპირი გადაყვანა
-  const handleInfluencerDirect = () => {
+  // 🚀 ფუნქცია სწრაფი გადასვლისთვის
+  const handleInfluencerClick = () => {
     setRole('influencer')
-    router.push('/dashboard/influencer') // 🎯 პირდაპირი გადასვლა
+    router.push('/dashboard/influencer')
   }
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -30,6 +30,8 @@ export default function AuthPage() {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
+        // წარმატებული Login-ის შემთხვევაშიც გადავიდეს დეშბორდზე
+        router.push(role === 'influencer' ? '/dashboard/influencer' : '/dashboard/brand')
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -60,7 +62,7 @@ export default function AuthPage() {
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="relative w-full max-w-sm bg-[#040d08]/95 border border-emerald-500/30 rounded-[60px] p-10 backdrop-blur-[100px] shadow-[0_50px_150px_rgba(0,0,0,1)] overflow-hidden"
+        className="relative w-full max-sm bg-[#040d08]/95 border border-emerald-500/30 rounded-[60px] p-10 backdrop-blur-[100px] shadow-[0_50px_150px_rgba(0,0,0,1)] overflow-hidden"
       >
         
         {/* 2. GIGANTIC 3D ORB BACKGROUND */}
@@ -71,7 +73,7 @@ export default function AuthPage() {
             className="relative w-[500px] h-[500px] rounded-full border border-emerald-500/20"
             style={{ transform: 'rotateX(65deg) rotateY(-15deg)' }} 
           >
-            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,_#10b981_0%,_transparent_75%)]" />
+            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,#10b981_0%,transparent_75%)]" />
             <motion.div animate={{ rotate: -360 }} transition={{ duration: 12, repeat: Infinity, ease: "linear" }} className="absolute inset-[-20px] border-dashed border border-emerald-500/10 rounded-full" />
           </motion.div>
         </div>
@@ -96,25 +98,25 @@ export default function AuthPage() {
                 exit={{ opacity: 0, x: 100 }}
                 className="space-y-5"
               >
-                {/* 🎯 ინფლუენსერის ღილაკი - ახლა პირდაპირ გადაჰყავხარ */}
+                {/* 🚀 ინფლუენსერის ღილაკი: პირდაპირი გადასვლა */}
                 <button 
-                  onClick={handleInfluencerDirect}
-                  className="w-full flex items-center justify-between gap-4 p-7 bg-emerald-950/10 rounded-[35px] border border-emerald-500/10 group hover:border-emerald-500/40 transition-all shadow-inner active:scale-95"
+                  onClick={handleInfluencerClick} 
+                  className="w-full flex items-center justify-between gap-4 p-7 bg-emerald-950/10 rounded-[35px] border border-emerald-500/10 group hover:border-emerald-500/40 transition-all shadow-inner"
                 >
                   <div className="flex flex-col items-start">
-                    <span className="text-[12px] text-emerald-500 uppercase tracking-widest mb-1 font-black italic leading-none">Influencer</span>
-                    <span className="text-[8px] text-gray-500 uppercase tracking-wider font-bold mt-2 leading-none">Access My Vault</span>
+                    <span className="text-[12px] text-emerald-500 uppercase tracking-widest mb-1 font-black italic">Influencer</span>
+                    <span className="text-[8px] text-gray-500 uppercase tracking-wider font-bold">Access My Token</span>
                   </div>
                   <svg className="w-5 h-5 text-emerald-500 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                 </button>
 
                 <button 
                   onClick={() => { setRole('brand'); setStep('auth'); }}
-                  className="w-full flex items-center justify-between gap-4 p-7 bg-blue-950/10 rounded-[35px] border border-blue-500/10 group hover:border-blue-500/40 transition-all shadow-inner active:scale-95"
+                  className="w-full flex items-center justify-between gap-4 p-7 bg-blue-950/10 rounded-[35px] border border-blue-500/10 group hover:border-blue-500/40 transition-all shadow-inner"
                 >
                   <div className="flex flex-col items-start">
-                    <span className="text-[12px] text-blue-500 uppercase tracking-widest mb-1 font-black italic leading-none">Brand</span>
-                    <span className="text-[8px] text-gray-500 uppercase tracking-wider font-bold mt-2 leading-none">Command Center</span>
+                    <span className="text-[12px] text-blue-500 uppercase tracking-widest mb-1 font-black italic">Brand</span>
+                    <span className="text-[8px] text-gray-500 uppercase tracking-wider font-bold">Command Center</span>
                   </div>
                   <svg className="w-5 h-5 text-blue-500 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                 </button>
