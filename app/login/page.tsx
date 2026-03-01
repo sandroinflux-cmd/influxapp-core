@@ -3,8 +3,10 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation' // 🚀 დამატებულია ნავიგაციისთვის
 
 export default function AuthPage() {
+  const router = useRouter() // 🚀 ინიციალიზაცია
   const [step, setStep] = useState<'gate' | 'auth'>('gate')
   const [role, setRole] = useState<'influencer' | 'brand'>('influencer')
   const [isLogin, setIsLogin] = useState(true)
@@ -22,7 +24,6 @@ export default function AuthPage() {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        // Middleware ავტომატურად გადაამისამართებს იუზერს როლის მიხედვით
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -56,7 +57,7 @@ export default function AuthPage() {
         className="relative w-full max-w-sm bg-[#040d08]/95 border border-emerald-500/30 rounded-[60px] p-10 backdrop-blur-[100px] shadow-[0_50px_150px_rgba(0,0,0,1)] overflow-hidden"
       >
         
-        {/* 1. NEW LOGO: The Galactic Core (როგორც ქვითარზე) */}
+        {/* 1. NEW LOGO: The Galactic Core */}
         <div className="absolute top-10 left-10 h-10 w-10 flex items-center justify-center relative opacity-80">
           <motion.div animate={{ rotate: 360, scale: [1, 1.2, 1] }} transition={{ rotate: { duration: 10, repeat: Infinity, ease: "linear" }, scale: { duration: 3, repeat: Infinity } }} className="absolute h-full w-full rounded-full bg-emerald-500/20 border border-emerald-500/40" />
           <motion.div animate={{ rotate: -360 }} transition={{ duration: 15, repeat: Infinity, ease: "linear" }} className="absolute h-[140%] w-[140%] border-t border-dotted border-emerald-500/30 rounded-full" />
@@ -71,7 +72,6 @@ export default function AuthPage() {
           <AnimatePresence mode="wait">
             {step === 'gate' ? (
               
-              /* STEP 1: THE GATE (როლის არჩევა) */
               <motion.div 
                 key="gate"
                 initial={{ opacity: 0, x: -100 }}
@@ -79,8 +79,9 @@ export default function AuthPage() {
                 exit={{ opacity: 0, x: 100 }}
                 className="space-y-5"
               >
+                {/* 🚀 ინფლუენსერის ღილაკი: ახლა პირდაპირ გადაჰყავს დეშბორდზე */}
                 <button 
-                  onClick={() => { setRole('influencer'); setStep('auth'); }}
+                  onClick={() => router.push('/dashboard/influencer')}
                   className="w-full flex items-center justify-between gap-4 p-7 bg-emerald-950/20 rounded-[35px] border border-emerald-500/20 group hover:border-emerald-500/50 transition-all shadow-[0_0_30px_rgba(16,185,129,0.1)]"
                 >
                   <div className="flex flex-col items-start">
@@ -104,7 +105,6 @@ export default function AuthPage() {
 
             ) : (
               
-              /* STEP 2: AUTH FORM (რეგისტრაცია/შესვლა) */
               <motion.div 
                 key="auth"
                 initial={{ opacity: 0, x: 100 }}
