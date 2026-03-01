@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation' // 🚀 დამატებულია ნავიგაციისთვის
+import { useRouter } from 'next/navigation' 
 
 export default function AuthPage() {
-  const router = useRouter() // 🚀 ინიციალიზაცია
+  const router = useRouter() 
   const [step, setStep] = useState<'gate' | 'auth'>('gate')
   const [role, setRole] = useState<'influencer' | 'brand'>('influencer')
   const [isLogin, setIsLogin] = useState(true)
@@ -79,7 +79,7 @@ export default function AuthPage() {
                 exit={{ opacity: 0, x: 100 }}
                 className="space-y-5"
               >
-                {/* 🚀 ინფლუენსერის ღილაკი: ახლა პირდაპირ გადაჰყავს დეშბორდზე */}
+                {/* 🚀 ინფლუენსერის ღილაკი: პირდაპირი გადასვლა */}
                 <button 
                   onClick={() => router.push('/dashboard/influencer')}
                   className="w-full flex items-center justify-between gap-4 p-7 bg-emerald-950/20 rounded-[35px] border border-emerald-500/20 group hover:border-emerald-500/50 transition-all shadow-[0_0_30px_rgba(16,185,129,0.1)]"
