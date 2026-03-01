@@ -36,19 +36,20 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
       <motion.div 
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="relative w-full max-w-[340px] bg-[#020402]/90 border border-white/15 rounded-[45px] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden print:border-none print:shadow-none backdrop-blur-2xl"
+        className="relative w-full max-w-[340px] bg-[#020402]/90 border border-white/20 rounded-[45px] shadow-[0_0_120px_rgba(0,0,0,1)] overflow-hidden print:border-none print:shadow-none backdrop-blur-3xl"
       >
-        {/* 💵 Bold Phosphorescent Watermarks: გაზრდილი და მკვეთრი ნეონის ვოთერმარკები */}
-        <div className="absolute inset-0 opacity-[0.18] pointer-events-none flex flex-wrap gap-x-14 gap-y-12 p-4 rotate-[15deg] z-0 justify-center">
-            {[...Array(24)].map((_, i) => (
+        {/* 💵 MAX GLOW WATERMARKS: გაბევრებული, გადიდებული და ჰიპერ-მანათობელი */}
+        <div className="absolute inset-0 opacity-[0.25] pointer-events-none flex flex-wrap gap-x-10 gap-y-14 p-4 rotate-[12deg] z-0 justify-center scale-110">
+            {[...Array(28)].map((_, i) => (
                 <motion.span 
                   key={i} 
                   animate={{ 
-                    opacity: [0.3, 0.8, 0.3],
-                    textShadow: ["0 0 5px #10b981", "0 0 15px #10b981", "0 0 5px #10b981"]
+                    opacity: [0.4, 1, 0.4],
+                    scale: [0.95, 1.05, 0.95],
+                    textShadow: ["0 0 10px #10b981", "0 0 30px #10b981", "0 0 10px #10b981"]
                   }}
-                  transition={{ duration: Math.random() * 3 + 2, repeat: Infinity }}
-                  className="text-[11px] font-black italic tracking-[0.2em] select-none uppercase text-emerald-400"
+                  transition={{ duration: Math.random() * 2 + 1.5, repeat: Infinity }}
+                  className="text-[14px] font-black italic tracking-[0.15em] select-none uppercase text-emerald-400 drop-shadow-2xl"
                 >
                   InfluXpay
                 </motion.span>
@@ -68,56 +69,63 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
         </div>
 
         <div className="p-6 space-y-6 relative z-10">
-          {/* 🔴 MERCHANT PROOF: GALAXY ENGINE */}
-          <div className="text-center py-5 bg-red-500/[0.03] rounded-[30px] border border-red-500/20 relative overflow-hidden flex items-center justify-center gap-3">
+          {/* 🔴 MERCHANT PROOF: BILLION-DOLLAR GALAXY ENGINE */}
+          <div className="text-center py-5 bg-red-500/[0.04] rounded-[30px] border border-red-500/20 relative overflow-hidden flex items-center justify-center gap-3">
             <div className="flex flex-col flex-1 pl-2">
               <span className="text-[8px] font-black text-red-500/50 uppercase tracking-[0.6em] block mb-1 italic text-left ml-4">Gross Input</span>
-              <h3 className="text-5xl font-black tracking-tighter text-red-500 italic leading-none">
+              <h3 className="text-5xl font-black tracking-tighter text-red-500 italic leading-none drop-shadow-[0_0_15px_rgba(239,68,68,0.4)]">
                 {originalAmount?.toFixed(2)}
               </h3>
             </div>
 
-            {/* 🪐 Interstellar Galaxy Sphere */}
-            <div className="relative h-18 w-18 flex items-center justify-center mr-1">
-              {/* Outer Glow & Shell */}
+            {/* 🪐 The "Interstellar" Infinite Galaxy Core */}
+            <div className="relative h-20 w-20 flex items-center justify-center mr-1 perspective-[1000px]">
+              {/* Event Horizon Glow */}
               <motion.div 
-                animate={{ rotate: 360 }} 
-                transition={{ duration: 15, repeat: Infinity, ease: "linear" }} 
-                className="absolute h-full w-full border-[0.5px] border-red-500/40 rounded-full shadow-[inset_0_0_20px_rgba(239,68,68,0.2)]" 
+                animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.6, 0.3] }} 
+                transition={{ duration: 3, repeat: Infinity }}
+                className="absolute h-full w-full bg-red-600/10 rounded-full blur-xl" 
               />
               
-              {/* Galactic Core */}
-              <div className="absolute h-6 w-6 bg-red-600 rounded-full blur-[10px] opacity-60 animate-pulse" />
-              
-              {/* Thousands of Star Points: 3D Surface Distribution */}
-              <motion.div 
-                animate={{ rotateY: 360, rotateZ: 360 }} 
-                transition={{ duration: 5, repeat: Infinity, ease: "linear" }} 
-                className="absolute h-[110%] w-[110%] rounded-full"
-                style={{ transformStyle: 'preserve-3d' }}
-              >
-                  {[...Array(20)].map((_, i) => (
-                    <div 
-                      key={i}
-                      className="absolute h-[1.5px] w-[1.5px] bg-white rounded-full shadow-[0_0_4px_white]"
-                      style={{ 
-                        top: `${Math.random() * 100}%`, 
+              {/* Spinning Galaxy Shells */}
+              {[...Array(3)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  animate={{ 
+                    rotateX: [0, 360], 
+                    rotateY: [360, 0], 
+                    rotateZ: [0, 360] 
+                  }}
+                  transition={{ 
+                    duration: 8 + i * 2, 
+                    repeat: Infinity, 
+                    ease: "linear" 
+                  }}
+                  className="absolute border border-red-500/20 rounded-full"
+                  style={{ 
+                    width: `${80 + i * 15}%`, 
+                    height: `${80 + i * 15}%`,
+                    transformStyle: 'preserve-3d'
+                  }}
+                >
+                  {/* Star Points inside each shell */}
+                  {[...Array(8)].map((_, j) => (
+                    <motion.div
+                      key={j}
+                      animate={{ opacity: [0.2, 1, 0.2] }}
+                      transition={{ duration: 1 + Math.random(), repeat: Infinity }}
+                      className="absolute h-1 w-1 bg-white rounded-full shadow-[0_0_6px_white]"
+                      style={{
+                        top: `${Math.random() * 100}%`,
                         left: `${Math.random() * 100}%`,
-                        transform: `translateZ(${Math.random() * 30 - 15}px)`
+                        transform: `translateZ(${Math.random() * 20 - 10}px)`
                       }}
                     />
                   ))}
-              </motion.div>
+                </motion.div>
+              ))}
 
-              {/* Accretion Disk */}
-              <motion.div 
-                animate={{ rotateX: 75, rotateZ: -360 }} 
-                transition={{ duration: 3, repeat: Infinity, ease: "linear" }} 
-                className="absolute h-[130%] w-[130%] border-[0.5px] border-red-400/30 rounded-full"
-                style={{ transformStyle: 'preserve-3d' }}
-              />
-
-              <div className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_20px_8px_rgba(239,68,68,0.9)] z-10" />
+              <div className="h-3 w-3 rounded-full bg-red-500 shadow-[0_0_25px_10px_rgba(239,68,68,1)] z-10" />
             </div>
           </div>
 
