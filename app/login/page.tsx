@@ -16,12 +16,6 @@ export default function AuthPage() {
   const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // 🚀 ფუნქცია სწრაფი გადასვლისთვის
-  const handleInfluencerClick = () => {
-    setRole('influencer')
-    router.push('/dashboard/influencer')
-  }
-
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -30,8 +24,6 @@ export default function AuthPage() {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        // წარმატებული Login-ის შემთხვევაშიც გადავიდეს დეშბორდზე
-        router.push(role === 'influencer' ? '/dashboard/influencer' : '/dashboard/brand')
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -62,7 +54,7 @@ export default function AuthPage() {
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="relative w-full max-sm bg-[#040d08]/95 border border-emerald-500/30 rounded-[60px] p-10 backdrop-blur-[100px] shadow-[0_50px_150px_rgba(0,0,0,1)] overflow-hidden"
+        className="relative w-full max-w-sm bg-[#040d08]/95 border border-emerald-500/30 rounded-[60px] p-10 backdrop-blur-[100px] shadow-[0_50px_150px_rgba(0,0,0,1)] overflow-hidden"
       >
         
         {/* 2. GIGANTIC 3D ORB BACKGROUND */}
@@ -73,7 +65,7 @@ export default function AuthPage() {
             className="relative w-[500px] h-[500px] rounded-full border border-emerald-500/20"
             style={{ transform: 'rotateX(65deg) rotateY(-15deg)' }} 
           >
-            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,#10b981_0%,transparent_75%)]" />
+            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,_#10b981_0%,_transparent_75%)]" />
             <motion.div animate={{ rotate: -360 }} transition={{ duration: 12, repeat: Infinity, ease: "linear" }} className="absolute inset-[-20px] border-dashed border border-emerald-500/10 rounded-full" />
           </motion.div>
         </div>
@@ -98,9 +90,9 @@ export default function AuthPage() {
                 exit={{ opacity: 0, x: 100 }}
                 className="space-y-5"
               >
-                {/* 🚀 ინფლუენსერის ღილაკი: პირდაპირი გადასვლა */}
                 <button 
-                  onClick={handleInfluencerClick} 
+                  // 🚀 პირდაპირი გადამისამართება ინფლუენსერის დეშბორდზე
+                  onClick={() => router.push('/dashboard/influencer')}
                   className="w-full flex items-center justify-between gap-4 p-7 bg-emerald-950/10 rounded-[35px] border border-emerald-500/10 group hover:border-emerald-500/40 transition-all shadow-inner"
                 >
                   <div className="flex flex-col items-start">
@@ -111,6 +103,7 @@ export default function AuthPage() {
                 </button>
 
                 <button 
+                  // 🚀 ბრენდისთვის ჯერ დავტოვოთ ავტორიზაციის ეტაპი
                   onClick={() => { setRole('brand'); setStep('auth'); }}
                   className="w-full flex items-center justify-between gap-4 p-7 bg-blue-950/10 rounded-[35px] border border-blue-500/10 group hover:border-blue-500/40 transition-all shadow-inner"
                 >
