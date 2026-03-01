@@ -36,19 +36,22 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
       <motion.div 
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        // 📏 ზომა შემცირებულია 15%-ით: 400px -> 340px
-        className="relative w-full max-w-[340px] bg-[#020402] border border-white/10 rounded-[45px] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden print:border-none print:shadow-none"
+        className="relative w-full max-w-[340px] bg-[#020402]/90 border border-white/10 rounded-[45px] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden print:border-none print:shadow-none backdrop-blur-md"
       >
-        {/* 💵 Flash Hologram Watermarks: მოციმციმე ვოთერმარკები ზედაპირზე */}
-        <div className="absolute inset-0 opacity-[0.05] pointer-events-none flex flex-wrap gap-8 p-4 rotate-12 z-0">
-            {[...Array(24)].map((_, i) => (
+        {/* 💵 Phosphorescent InfluXpay Watermarks: მბჟუტავი ფოსფორის ეფექტი */}
+        <div className="absolute inset-0 opacity-[0.1] pointer-events-none flex flex-wrap gap-10 p-6 rotate-[15deg] z-0">
+            {[...Array(30)].map((_, i) => (
                 <motion.span 
                   key={i} 
-                  animate={{ opacity: [0.2, 0.6, 0.2] }}
-                  transition={{ duration: Math.random() * 3 + 2, repeat: Infinity }}
-                  className="text-white font-black italic text-xs tracking-tighter select-none"
+                  animate={{ 
+                    opacity: [0.1, 0.5, 0.1],
+                    color: ["#10b981", "#ffffff", "#10b981"],
+                    filter: ["blur(0px)", "blur(1px)", "blur(0px)"]
+                  }}
+                  transition={{ duration: Math.random() * 4 + 3, repeat: Infinity }}
+                  className="text-[8px] font-black italic tracking-tighter select-none uppercase"
                 >
-                  InfluX
+                  InfluXpay
                 </motion.span>
             ))}
         </div>
@@ -66,46 +69,45 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
         </div>
 
         <div className="p-6 space-y-6 relative z-10">
-          {/* 🔴 LUXURY CRIMSON: MERCHANT PROOF */}
+          {/* 🔴 MERCHANT PROOF: INTERSTELLAR ENGINE */}
           <div className="text-center py-5 bg-red-500/[0.03] rounded-[30px] border border-red-500/20 relative overflow-hidden flex items-center justify-center gap-3">
             <div className="flex flex-col flex-1 pl-2">
               <span className="text-[8px] font-black text-red-500/50 uppercase tracking-[0.6em] block mb-1 italic text-left ml-4">Gross Input</span>
-              <h3 className="text-5xl font-black tracking-tighter text-red-500 italic leading-none drop-shadow-[0_0_15px_rgba(239,68,68,0.3)]">
+              <h3 className="text-5xl font-black tracking-tighter text-red-500 italic leading-none">
                 {originalAmount?.toFixed(2)}
               </h3>
             </div>
 
-            {/* ⚙️ 360° High-Speed 3D Security Sphere */}
+            {/* 🪐 Interstellar Event Horizon Sphere */}
             <div className="relative h-16 w-16 flex items-center justify-center mr-2">
               <motion.div 
-                animate={{ rotate: 360 }} 
-                transition={{ duration: 3, repeat: Infinity, ease: "linear" }} 
-                className="absolute h-full w-full border border-red-500/20 rounded-full shadow-[inset_0_0_15px_rgba(239,68,68,0.1)]" 
+                animate={{ rotate: 360, scale: [1, 1.05, 1] }} 
+                transition={{ duration: 10, repeat: Infinity, ease: "linear" }} 
+                className="absolute h-full w-full border border-red-500/30 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.2)]" 
               />
+              <div className="absolute h-4 w-4 bg-red-600 rounded-full blur-[8px] animate-pulse" />
+              
+              {/* Rotating Accretion Disk of Points */}
               <motion.div 
-                animate={{ rotateY: 360, rotateX: 360 }} 
-                transition={{ duration: 4, repeat: Infinity, ease: "linear" }} 
-                className="absolute h-4/5 w-4/5 border border-red-500/40 rounded-full flex items-center justify-center"
+                animate={{ rotateX: 70, rotateZ: 360 }} 
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }} 
+                className="absolute h-[120%] w-[120%] rounded-full"
                 style={{ transformStyle: 'preserve-3d' }}
               >
-                  {/* Internal Multi-Point Matrix */}
-                  <div className="w-full h-full relative">
-                      {[...Array(6)].map((_, i) => (
-                        <motion.div 
-                          key={i}
-                          animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.8, 0.3] }}
-                          transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
-                          className="absolute h-1 w-1 bg-white rounded-full shadow-[0_0_8px_white]"
-                          style={{ 
-                            top: `${50 + Math.sin(i) * 40}%`, 
-                            left: `${50 + Math.cos(i) * 40}%`,
-                            transform: `translateZ(${Math.sin(i) * 20}px)`
-                          }}
-                        />
-                      ))}
-                  </div>
+                  {[...Array(12)].map((_, i) => (
+                    <motion.div 
+                      key={i}
+                      animate={{ opacity: [0.2, 1, 0.2] }}
+                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.1 }}
+                      className="absolute h-0.5 w-0.5 bg-red-400 rounded-full"
+                      style={{ 
+                        top: `${50 + Math.sin(i) * 50}%`, 
+                        left: `${50 + Math.cos(i) * 50}%` 
+                      }}
+                    />
+                  ))}
               </motion.div>
-              <div className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_15px_5px_rgba(239,68,68,0.7)] z-10" />
+              <div className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_15px_5px_rgba(239,68,68,0.8)] z-10" />
             </div>
           </div>
 
@@ -146,7 +148,7 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
           </div>
         </div>
 
-        {/* 🚀 ACTIONS: Download Sized */}
+        {/* 🚀 ACTIONS: Download */}
         <div className="p-6 pt-0 flex flex-col gap-3 relative z-10">
           <button 
             onClick={handlePrint} 
