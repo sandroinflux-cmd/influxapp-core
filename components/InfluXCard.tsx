@@ -3,7 +3,6 @@
 import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
 import { useState, ReactNode } from 'react'
 
-// 116 დილის გენერაცია უკანა მხარისთვის
 const matrixDeals = Array.from({ length: 116 }, (_, i) => ({
   id: i + 1,
   brand: ['Nike', 'Tesla', 'Apple', 'Adidas', 'Hublot'][i % 5],
@@ -16,17 +15,18 @@ const matrixDeals = Array.from({ length: 116 }, (_, i) => ({
 export default function InfluXCard({ deal, children }: { deal: any, children?: ReactNode }) {
   const [isFlipped, setIsFlipped] = useState(false)
   
-  // 🚀 Spring Physics for "InfluX Style" Movement
+  // 🚀 Liquid Physics: დავამატე 'mass' და 'damping' სითხევადობისთვის
   const x = useMotionValue(0)
   const y = useMotionValue(0)
-  const mouseXSpring = useSpring(x, { stiffness: 300, damping: 30 })
-  const mouseYSpring = useSpring(y, { stiffness: 300, damping: 30 })
+  const mouseXSpring = useSpring(x, { stiffness: 150, damping: 25, mass: 0.5 })
+  const mouseYSpring = useSpring(y, { stiffness: 150, damping: 25, mass: 0.5 })
 
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], [25, -25])
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], [-25, 25])
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], [20, -20])
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], [-20, 20])
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
+    // 🖱️ კოორდინატების გამოთვლა უფრო რბილი ტრეკინგისთვის
     x.set((e.clientX - rect.left) / rect.width - 0.5)
     y.set((e.clientY - rect.top) / rect.height - 0.5)
   }
@@ -41,14 +41,14 @@ export default function InfluXCard({ deal, children }: { deal: any, children?: R
       <motion.div
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        onDoubleClick={() => setIsFlipped(!isFlipped)} // Double Tap ამოტრიალება
+        onDoubleClick={() => setIsFlipped(!isFlipped)}
         style={{ 
             rotateX: isFlipped ? 0 : rotateX, 
             rotateY: isFlipped ? 180 : rotateY, 
             transformStyle: "preserve-3d" 
         }}
         animate={{ rotateY: isFlipped ? 180 : 0 }}
-        transition={{ duration: 0.9, ease: [0.19, 1, 0.22, 1] }}
+        transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
         className="relative h-[620px] group cursor-pointer"
       >
         
@@ -80,8 +80,8 @@ export default function InfluXCard({ deal, children }: { deal: any, children?: R
               </motion.div>
           </div>
 
-          <div className="flex-1 flex flex-col items-center justify-center w-full relative z-10">
-              <h3 className="text-4xl font-black italic tracking-[1px] uppercase text-white leading-none mt-4">Influencer X</h3>
+          <div className="flex-1 flex flex-col items-center justify-center w-full relative z-10 mt-4">
+              <h3 className="text-4xl font-black italic tracking-[1px] uppercase text-white leading-none">Influencer X</h3>
               <div className="h-[1px] w-12 bg-emerald-500/40 mt-4 mb-2" />
               <p className="text-[7px] text-emerald-500/50 font-black uppercase tracking-[0.4em] italic leading-none truncate">
                 {deal?.brands?.name || 'Authorized Node'}
@@ -89,11 +89,12 @@ export default function InfluXCard({ deal, children }: { deal: any, children?: R
           </div>
         </div>
 
-        {/* === BACK SIDE (Liquid Deals Matrix) === */}
+        {/* === BACK SIDE (Scrollable Deals Matrix) === */}
         <div 
           className="absolute inset-0 bg-[#020302] border-2 border-white/5 rounded-[45px] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden"
           style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
         >
+          {/* ✅ დავამატე 'overflow-y-auto' და 'scrollbar-hide' სქროლვისთვის */}
           <div className="w-full h-full overflow-y-auto scrollbar-hide p-6 bg-[radial-gradient(circle_at_0%_0%,#ffffff03,transparent_50%)]">
             <div className="grid grid-cols-2 gap-4 auto-rows-fr">
               {matrixDeals.map((mDeal) => (
@@ -103,9 +104,9 @@ export default function InfluXCard({ deal, children }: { deal: any, children?: R
                       <h3 className="text-[10px] font-black italic uppercase text-white tracking-widest leading-none truncate w-full">{mDeal.brand}</h3>
                   </div>
                   <div className="flex flex-col items-center justify-center flex-1 relative z-10 py-4">
-                    <h2 className="text-3xl font-black italic tracking-tighter uppercase text-center leading-none" style={{ color: mDeal.color, textShadow: `0 0 25px ${mDeal.glow}` }}>{mDeal.offer}</h2>
+                    <h2 className="text-2xl font-black italic tracking-tighter uppercase text-center leading-none" style={{ color: mDeal.color, textShadow: `0 0 25px ${mDeal.glow}` }}>{mDeal.offer}</h2>
                   </div>
-                  <div className="text-[6px] font-black uppercase tracking-[0.4em] text-gray-700 border-t border-white/5 pt-3 relative z-10 w-full text-center">Auth Node</div>
+                  <div className="text-[6px] font-black uppercase tracking-[0.4em] text-gray-700 border-t border-white/5 pt-3 relative z-10 w-full text-center font-mono">NODE-{mDeal.id}</div>
                 </div>
               ))}
             </div>
@@ -113,10 +114,14 @@ export default function InfluXCard({ deal, children }: { deal: any, children?: R
         </div>
       </motion.div>
 
-      {/* Stats/Children Overlay */}
       <div className="relative z-20">
         {children}
       </div>
+
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </div>
   )
 }
