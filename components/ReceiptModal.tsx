@@ -36,20 +36,16 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
       <motion.div 
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="relative w-full max-w-[340px] bg-[#020402]/90 border border-white/20 rounded-[45px] shadow-[0_0_120px_rgba(16,185,129,0.1)] overflow-hidden print:border-none print:shadow-none backdrop-blur-3xl"
+        className="relative w-full max-w-[340px] bg-[#020402]/90 border border-white/15 rounded-[45px] shadow-[0_0_120px_rgba(16,185,129,0.1)] overflow-hidden print:border-none print:shadow-none backdrop-blur-3xl"
       >
-        {/* 💵 Bold Phosphorescent Watermarks */}
+        {/* 💵 MAX-ILLUMINATED WATERMARKS */}
         <div className="absolute inset-0 opacity-[0.25] pointer-events-none flex flex-wrap gap-x-16 gap-y-14 p-4 rotate-[20deg] z-0 justify-center">
             {[...Array(18)].map((_, i) => (
                 <motion.span 
                   key={i} 
-                  animate={{ 
-                    opacity: [0.4, 1, 0.4],
-                    scale: [1, 1.1, 1],
-                    textShadow: ["0 0 10px #10b981", "0 0 25px #10b981", "0 0 10px #10b981"]
-                  }}
-                  transition={{ duration: Math.random() * 3 + 2, repeat: Infinity }}
-                  className="text-[14px] font-black italic tracking-[0.3em] select-none uppercase text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,1)]"
+                  animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.1, 1], textShadow: ["0 0 10px #10b981", "0 0 25px #10b981", "0 0 10px #10b981"] }}
+                  transition={{ duration: Math.random() * 2 + 1, repeat: Infinity }}
+                  className="text-[14px] font-black italic tracking-[0.3em] select-none uppercase text-emerald-400"
                 >
                   InfluXpay
                 </motion.span>
@@ -62,104 +58,89 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
             <span className="text-[6px] font-black text-emerald-500 uppercase tracking-[0.4em] mb-1 italic">Authorized Merchant</span>
             <h4 className="text-xs font-black italic text-white tracking-widest uppercase truncate w-32">{brandName}</h4>
           </div>
-          <div className="h-9 w-9 rounded-xl bg-black border border-emerald-500/30 flex items-center justify-center relative overflow-hidden shadow-inner">
+          <div className="h-9 w-9 rounded-xl bg-black border border-emerald-500/20 flex items-center justify-center relative overflow-hidden shadow-inner">
              <motion.div animate={{ top: ["-100%", "200%"] }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }} className="absolute w-full h-[1px] bg-emerald-400 shadow-[0_0_15px_#10b981] z-20" />
              <span className="text-lg">🤖</span>
           </div>
         </div>
 
         <div className="p-6 space-y-6 relative z-10">
-          {/* 🔴 MERCHANT PROOF: THE SINGULARITY CORE */}
-          <div className="text-center py-5 bg-red-500/[0.03] rounded-[30px] border border-red-500/20 relative overflow-hidden flex items-center justify-center gap-2">
+          {/* 🔴 MERCHANT PROOF: LARGE GLOSSY RED */}
+          <div className="text-center py-5 bg-red-600/[0.05] rounded-[30px] border border-red-500/30 relative overflow-hidden flex items-center justify-center gap-2 shadow-[inset_0_0_20px_rgba(239,68,68,0.1)]">
             <div className="flex flex-col flex-1 pl-2">
-              <span className="text-[8px] font-black text-red-500/50 uppercase tracking-[0.6em] block mb-1 italic text-left ml-4">Gross Input</span>
-              <h3 className="text-5xl font-black tracking-tighter text-red-500 italic leading-none opacity-60">
+              <span className="text-[8px] font-black text-red-500 uppercase tracking-[0.6em] block mb-1 italic text-left ml-4">Input Amount</span>
+              <h3 className="text-6xl font-black tracking-tighter text-red-500 italic leading-none drop-shadow-[0_0_20px_rgba(239,68,68,0.6)]">
                 {originalAmount?.toFixed(2)}
               </h3>
             </div>
 
-            {/* 🪐 SINGULARITY CORE: Gemini Custom Design */}
+            {/* 🪐 RED LASER QUANTUM ENGINE */}
             <div className="relative h-20 w-20 flex items-center justify-center mr-1 overflow-hidden scale-110">
-              {/* Event Horizon Rings */}
-              <motion.div animate={{ rotate: 360 }} transition={{ duration: 3, repeat: Infinity, ease: "linear" }} className="absolute h-[95%] w-[95%] border-t-[1.5px] border-red-500/40 rounded-full" />
-              <motion.div animate={{ rotate: -360 }} transition={{ duration: 5, repeat: Infinity, ease: "linear" }} className="absolute h-[75%] w-[75%] border-b-[1px] border-white/20 rounded-full" />
-              
-              {/* Infinite Particle Nebula */}
               <motion.div 
-                animate={{ rotateY: 360, rotateZ: 360 }} 
-                transition={{ duration: 10, repeat: Infinity, ease: "linear" }} 
+                animate={{ rotateY: 360, rotateX: 360, rotateZ: 360 }} 
+                transition={{ duration: 6, repeat: Infinity, ease: "linear" }} 
                 className="absolute h-full w-full rounded-full"
                 style={{ transformStyle: 'preserve-3d' }}
               >
-                  {[...Array(30)].map((_, i) => (
+                  {[...Array(50)].map((_, i) => (
                     <motion.div 
                       key={i}
-                      animate={{ scale: [0, 1.2, 0], opacity: [0, 1, 0] }}
-                      transition={{ duration: Math.random() * 2 + 1, repeat: Infinity, delay: Math.random() }}
-                      className="absolute h-[1px] w-[1px] bg-white rounded-full"
+                      animate={{ opacity: [0.1, 1, 0.1], scale: [1, 1.8, 1] }}
+                      transition={{ duration: Math.random() * 1.5 + 0.5, repeat: Infinity }}
+                      className="absolute h-[1.5px] w-[1.5px] bg-red-500 rounded-full shadow-[0_0_10px_#ef4444]"
                       style={{ 
                         top: `${Math.random() * 100}%`, 
                         left: `${Math.random() * 100}%`,
-                        transform: `translateZ(${Math.random() * 40 - 20}px)`
+                        transform: `translateZ(${Math.random() * 80 - 40}px)`
                       }}
                     />
                   ))}
               </motion.div>
-
-              {/* Gravity Well (Black Core) */}
-              <div className="absolute h-6 w-6 bg-black rounded-full shadow-[0_0_20px_2px_rgba(239,68,68,0.4)] border border-red-500/20 z-10 flex items-center justify-center">
-                 <div className="h-1 w-1 bg-red-500 rounded-full animate-ping" />
-              </div>
+              <div className="h-3 w-3 rounded-full bg-red-600 shadow-[0_0_30px_12px_rgba(239,68,68,1)] z-10 animate-pulse" />
+              <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }} className="absolute h-full w-full border-t-2 border-red-500/60 rounded-full" />
             </div>
           </div>
 
-          {/* ⚪ THE SETTLED MATRIX: SEXY NEON STYLE */}
-          <div className="text-center relative py-2">
-            <span className="text-[8px] font-black text-white/30 uppercase tracking-[1.2em] block mb-2 italic">Settled Matrix</span>
-            <motion.h2 
-              animate={{ textShadow: ["0 0 10px #fff", "0 0 30px #fff", "0 0 10px #fff"] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="text-8xl font-black tracking-tighter text-white italic leading-none drop-shadow-[0_10px_20px_rgba(255,255,255,0.2)]"
-            >
+          {/* ⚪ FINAL SETTLE: CLEAN WHITE */}
+          <div className="text-center relative">
+            <span className="text-[8px] font-black text-white/30 uppercase tracking-[1em] block mb-1 italic">Settled Matrix</span>
+            <h2 className="text-7xl font-black tracking-tighter text-white italic leading-none">
               {total.toFixed(2)}
-            </motion.h2>
-            <div className="flex items-center justify-center gap-2 mt-4">
-              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981] animate-pulse" />
-              <span className="text-[10px] font-black text-emerald-500/60 uppercase tracking-[0.6em] italic leading-none">GEL Secure</span>
+            </h2>
+            <div className="flex items-center justify-center gap-2 mt-3 opacity-40">
+              <div className="h-1 w-1 rounded-full bg-white" />
+              <span className="text-[9px] font-black text-white uppercase tracking-[0.5em] italic leading-none">GEL Verified</span>
             </div>
           </div>
 
-          {/* 💰 EMERALD GLOW: MATRIX YIELD */}
-          <div className="bg-emerald-500/[0.04] border border-emerald-500/20 rounded-[25px] py-4 flex flex-col items-center justify-center relative overflow-hidden">
-            <span className="text-[7px] font-black text-emerald-500/60 uppercase tracking-[0.6em] mb-1 italic">Matrix Saving</span>
+          {/* 💰 PSYCHOLOGICAL GREEN GLOW */}
+          <div className="bg-emerald-500/[0.06] border border-emerald-500/30 rounded-[25px] py-4 flex flex-col items-center justify-center relative overflow-hidden shadow-[0_0_30px_rgba(16,185,129,0.15)]">
+            <span className="text-[7px] font-black text-emerald-500 uppercase tracking-[0.6em] mb-1 italic">Benefit Realized</span>
             <motion.span 
-              animate={{ opacity: [0.7, 1, 0.7] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-              className="text-3xl font-black text-emerald-400 tracking-tight shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+              animate={{ opacity: [0.8, 1, 0.8], textShadow: ["0 0 10px #10b981", "0 0 25px #10b981", "0 0 10px #10b981"] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="text-4xl font-black text-emerald-400 tracking-tight"
             >
-              -{savings.toFixed(2)} <span className="text-xs opacity-40">GEL</span>
+              -{savings.toFixed(2)} <span className="text-xs opacity-50">GEL</span>
             </motion.span>
           </div>
 
-          {/* 🛡️ Secure Data Block */}
+          {/* 🛡️ Data Block */}
           <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-5 font-mono">
             <div className="flex flex-col">
               <span className="text-[5px] font-black text-gray-700 uppercase tracking-widest mb-1">Node Hash</span>
               <span className="text-[8px] text-emerald-500/80 font-bold italic truncate">#INX-{hash}</span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-[5px] font-black text-gray-700 uppercase tracking-widest mb-1">Verified Time</span>
+              <span className="text-[5px] font-black text-gray-700 uppercase tracking-widest mb-1">Trace Time</span>
               <span className="text-[8px] text-white/60 font-bold">{time.toLocaleTimeString()}</span>
             </div>
           </div>
         </div>
 
-        {/* 🚀 ACTIONS: Download */}
+        {/* 🚀 ACTIONS */}
         <div className="p-6 pt-0 flex flex-col gap-3 relative z-10">
-          <button 
-            onClick={handlePrint} 
-            className="w-full bg-white text-black py-4 rounded-[22px] font-black text-[10px] tracking-[0.4em] uppercase hover:bg-emerald-500 hover:text-white transition-all shadow-2xl active:scale-95"
-          >
+          <button onClick={handlePrint} className="w-full bg-white text-black py-4 rounded-[22px] font-black text-[10px] tracking-[0.4em] uppercase hover:bg-emerald-500 hover:text-white transition-all shadow-2xl active:scale-95">
             DOWNLOAD
           </button>
           <button onClick={onDone} className="w-full py-2 text-[7px] font-black text-gray-700 uppercase tracking-[0.3em] hover:text-white transition-colors italic">
