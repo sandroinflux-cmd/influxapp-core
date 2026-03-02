@@ -36,9 +36,9 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
       <motion.div 
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="relative w-full max-w-[340px] bg-[#020402]/90 border border-white/15 rounded-[45px] shadow-[0_0_120px_rgba(16,185,129,0.1)] overflow-hidden print:border-none print:shadow-none backdrop-blur-3xl"
+        className="relative w-full max-w-[340px] bg-[#020402]/90 border border-white/20 rounded-[45px] shadow-[0_0_120px_rgba(16,185,129,0.1)] overflow-hidden print:border-none print:shadow-none backdrop-blur-3xl"
       >
-        {/* 💵 MAX-ILLUMINATED WATERMARKS */}
+        {/* 💵 Bold Phosphorescent Watermarks */}
         <div className="absolute inset-0 opacity-[0.25] pointer-events-none flex flex-wrap gap-x-16 gap-y-14 p-4 rotate-[20deg] z-0 justify-center">
             {[...Array(18)].map((_, i) => (
                 <motion.span 
@@ -58,14 +58,14 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
             <span className="text-[6px] font-black text-emerald-500 uppercase tracking-[0.4em] mb-1 italic">Authorized Merchant</span>
             <h4 className="text-xs font-black italic text-white tracking-widest uppercase truncate w-32">{brandName}</h4>
           </div>
-          <div className="h-9 w-9 rounded-xl bg-black border border-emerald-500/20 flex items-center justify-center relative overflow-hidden shadow-inner">
+          <div className="h-9 w-9 rounded-xl bg-black border border-emerald-500/30 flex items-center justify-center relative overflow-hidden shadow-inner">
              <motion.div animate={{ top: ["-100%", "200%"] }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }} className="absolute w-full h-[1px] bg-emerald-400 shadow-[0_0_15px_#10b981] z-20" />
              <span className="text-lg">🤖</span>
           </div>
         </div>
 
         <div className="p-6 space-y-6 relative z-10">
-          {/* 🔴 MERCHANT PROOF: LARGE GLOSSY RED */}
+          {/* 🔴 MERCHANT PROOF: UNIFORM SIZE RED */}
           <div className="text-center py-5 bg-red-600/[0.05] rounded-[30px] border border-red-500/30 relative overflow-hidden flex items-center justify-center gap-2 shadow-[inset_0_0_20px_rgba(239,68,68,0.1)]">
             <div className="flex flex-col flex-1 pl-2">
               <span className="text-[8px] font-black text-red-500 uppercase tracking-[0.6em] block mb-1 italic text-left ml-4">Input Amount</span>
@@ -101,10 +101,10 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
             </div>
           </div>
 
-          {/* ⚪ FINAL SETTLE: CLEAN WHITE */}
-          <div className="text-center relative">
+          {/* ⚪ FINAL SETTLE: UNIFORM SIZE WHITE */}
+          <div className="text-center relative py-4 bg-white/[0.02] border border-white/5 rounded-[30px]">
             <span className="text-[8px] font-black text-white/30 uppercase tracking-[1em] block mb-1 italic">Settled Matrix</span>
-            <h2 className="text-7xl font-black tracking-tighter text-white italic leading-none">
+            <h2 className="text-6xl font-black tracking-tighter text-white italic leading-none">
               {total.toFixed(2)}
             </h2>
             <div className="flex items-center justify-center gap-2 mt-3 opacity-40">
@@ -113,13 +113,13 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
             </div>
           </div>
 
-          {/* 💰 PSYCHOLOGICAL GREEN GLOW */}
-          <div className="bg-emerald-500/[0.06] border border-emerald-500/30 rounded-[25px] py-4 flex flex-col items-center justify-center relative overflow-hidden shadow-[0_0_30px_rgba(16,185,129,0.15)]">
+          {/* 💰 UNIFORM SIZE GREEN GLOW */}
+          <div className="bg-emerald-500/[0.06] border border-emerald-500/30 rounded-[30px] py-6 flex flex-col items-center justify-center relative overflow-hidden shadow-[0_0_30px_rgba(16,185,129,0.15)]">
             <span className="text-[7px] font-black text-emerald-500 uppercase tracking-[0.6em] mb-1 italic">Benefit Realized</span>
             <motion.span 
               animate={{ opacity: [0.8, 1, 0.8], textShadow: ["0 0 10px #10b981", "0 0 25px #10b981", "0 0 10px #10b981"] }}
               transition={{ duration: 2, repeat: Infinity }}
-              className="text-4xl font-black text-emerald-400 tracking-tight"
+              className="text-6xl font-black text-emerald-400 tracking-tighter italic"
             >
               -{savings.toFixed(2)} <span className="text-xs opacity-50">GEL</span>
             </motion.span>
