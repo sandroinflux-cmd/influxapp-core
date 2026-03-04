@@ -1,116 +1,177 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 
-const allBrands = [
-  { id: 1, name: 'Nike Energy', category: 'Sportswear', isPartner: true, logo: '👟', match: 98 },
-  { id: 2, name: 'Tesla Motors', category: 'Tech', isPartner: false, logo: '⚡', match: 85 },
-  { id: 3, name: 'Apple Digital', category: 'Electronics', isPartner: true, logo: '🍎', match: 92 },
-  { id: 4, name: 'Starbucks Prime', category: 'F&B', isPartner: false, logo: '☕', match: 74 },
-  { id: 5, name: 'Rolex Elite', category: 'Luxury', isPartner: false, logo: '⌚', match: 91 },
-  { id: 6, name: 'Red Bull Gear', category: 'Lifestyle', isPartner: true, logo: '🥤', match: 88 },
-]
+export default function InfluencerMarketplace() {
+  const [filter, setFilter] = useState<'partners' | 'new' | 'offers'>('new')
+  const [brands, setBrands] = useState<any[]>([])
+  const [offers, setOffers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  
+  const [selectedBrand, setSelectedBrand] = useState<any>(null)
+  const [activeOffer, setActiveOffer] = useState<any>(null)
+  
+  const [message, setMessage] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-export default function MarketplacePage() {
-  const [filter, setFilter] = useState<'partners' | 'new'>('new')
+  useEffect(() => {
+    fetchData()
+  }, [filter])
 
-  const filteredBrands = allBrands.filter(brand => 
-    filter === 'partners' ? brand.isPartner : !brand.isPartner
-  )
+  const fetchData = async () => {
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
 
-  // 🧪 ინტენსივობის გამომთვლელი ფუნქცია
-  const getIntensity = (match: number) => {
-    if (match >= 95) return { opacity: [0.4, 1, 0.4], glow: '25px', speed: 2.5 }
-    if (match >= 90) return { opacity: [0.3, 0.8, 0.3], glow: '15px', speed: 3.5 }
-    return { opacity: [0.2, 0.6, 0.2], glow: '8px', speed: 5 }
+    if (filter === 'offers') {
+      const { data } = await supabase
+        .from('requests')
+        .select(`*, sender:profiles!sender_id(full_name), deal:deals(*)`)
+        .eq('receiver_id', user?.id)
+        .eq('status', 'deal_offered')
+      setOffers(data || [])
+    } else {
+      const { data: brandsData } = await supabase.from('profiles').select('*').eq('role', 'brand')
+      const { data: partnersData } = await supabase.from('partnerships').select('brand_id').eq('influencer_id', user?.id).eq('status', 'active')
+      const partnerIds = partnersData?.map(p => p.brand_id) || []
+      setBrands(brandsData?.map(b => ({ ...b, isPartner: partnerIds.includes(b.id) })) || [])
+    }
+    setLoading(false)
+  }
+
+  const handleRequestBrand = async () => {
+    setIsSubmitting(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('requests').insert([{
+      sender_id: user?.id,
+      receiver_id: selectedBrand.id,
+      message,
+      type: 'influencer_to_brand',
+      status: 'pending'
+    }])
+    setSelectedBrand(null); setMessage(''); fetchData();
+    setIsSubmitting(false)
+  }
+
+  const handleRejectOffer = async (offerId: string) => {
+    await supabase.from('requests').delete().eq('id', offerId)
+    setActiveOffer(null)
+    fetchData()
+  }
+
+  // ✅ გასწორებული Accept ფუნქცია - ახლა უკვე მუშაობს!
+  const handleAcceptOffer = async () => {
+    setIsSubmitting(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    // 1. ვამატებთ პარტნიორობას
+    const { error: partError } = await supabase.from('partnerships').insert([{
+      brand_id: activeOffer.sender_id,
+      influencer_id: user?.id,
+      deal_id: activeOffer.deal_id,
+      total_percentage: activeOffer.proposed_percentage,
+      status: 'active'
+    }])
+
+    if (partError) {
+      console.error("Partnership Error:", partError)
+      alert(`ACCEPT FAILED: ${partError.message}`)
+      setIsSubmitting(false)
+      return
+    }
+
+    // 2. ვაახლებთ მოთხოვნის სტატუსს
+    await supabase.from('requests').update({ status: 'accepted' }).eq('id', activeOffer.id)
+    
+    alert("NODE ACTIVATED: DEAL IS LIVE IN YOUR VAULT")
+    setActiveOffer(null)
+    setFilter('partners')
+    fetchData()
+    setIsSubmitting(false)
   }
 
   return (
-    <main className="min-h-screen w-full bg-[#010201] text-white p-8 md:p-12">
-      
-      {/* Header & Filter */}
+    <main className="min-h-screen w-full bg-[#010201] text-white p-8 md:p-12 font-sans italic uppercase font-black">
       <header className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-20 gap-8">
         <div>
-          <h1 className="text-5xl font-black tracking-tighter uppercase italic">
-            Brand <span className="text-emerald-500 text-glow">Marketplace</span>
-          </h1>
-          <p className="text-[10px] text-gray-500 font-black tracking-[0.5em] uppercase mt-3 opacity-60">
-            Unified Emerald Protocol
-          </p>
+          <h1 className="text-5xl tracking-tighter italic leading-none uppercase">Brand <span className="text-emerald-500">Marketplace</span></h1>
         </div>
-
         <div className="flex bg-[#040d08] p-1.5 rounded-[22px] border border-white/5">
-          {['partners', 'new'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setFilter(tab as any)}
-              className={`px-10 py-3 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all ${
-                filter === tab ? 'bg-emerald-500 text-black shadow-lg' : 'text-gray-500 hover:text-white'
-              }`}
-            >
-              {tab === 'partners' ? 'My Partners' : 'New Opportunities'}
+          {['partners', 'new', 'offers'].map((tab) => (
+            <button key={tab} onClick={() => setFilter(tab as any)}
+              className={`px-8 py-3 rounded-[18px] text-[9px] tracking-widest transition-all ${filter === tab ? 'bg-emerald-500 text-black shadow-lg' : 'text-gray-500 hover:text-white'}`}>
+              {tab === 'offers' ? 'Incoming Offers' : tab === 'partners' ? 'My Partners' : 'New Opportunities'}
             </button>
           ))}
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-        <AnimatePresence mode="popLayout">
-          {filteredBrands.map((brand) => {
-            const style = getIntensity(brand.match)
-            return (
-              <motion.div
-                layout
-                key={brand.id}
-                className="group bg-[#040d08]/60 border border-white/5 rounded-[45px] p-10 hover:border-emerald-500/30 transition-all duration-700 relative overflow-hidden backdrop-blur-3xl"
-              >
-                {/* 🟢 Unified Breathing Match Score */}
-                <motion.div 
-                  className="absolute top-8 right-12 flex flex-col items-end"
-                  animate={{
-                    opacity: style.opacity,
-                    textShadow: [
-                      `0 0 5px #10B981cc`,
-                      `0 0 ${style.glow} #10B981`,
-                      `0 0 5px #10B981cc`
-                    ]
-                  }}
-                  transition={{
-                    duration: style.speed,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                >
-                  <span className="text-[7px] font-black text-emerald-500/40 uppercase tracking-widest">Match Score</span>
-                  <span className="text-sm font-black italic text-emerald-500">{brand.match}%</span>
-                </motion.div>
-
-                {/* Brand Visuals */}
-                <div className="flex flex-col items-start gap-6 mb-12">
-                  <div className="h-20 w-20 rounded-[30px] bg-white/[0.03] border border-white/10 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform duration-500">
-                    {brand.logo}
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black tracking-tighter text-white uppercase">{brand.name}</h3>
-                    <p className="text-[10px] text-gray-600 font-black uppercase tracking-[0.2em] mt-1">{brand.category}</p>
-                  </div>
-                </div>
-
-                <div className="pt-8 border-t border-white/5">
-                  <button className={`w-full py-5 rounded-[28px] font-black text-[11px] uppercase tracking-[0.2em] transition-all duration-500 ${
-                    brand.isPartner 
-                      ? 'bg-emerald-500/5 border border-emerald-500/20 text-emerald-500 hover:bg-emerald-500 hover:text-black' 
-                      : 'bg-white text-black hover:shadow-[0_15px_30px_rgba(255,255,255,0.1)]'
-                  }`}>
-                    {brand.isPartner ? 'Active Partnership' : 'Request Deal'}
-                  </button>
-                </div>
-              </motion.div>
-            )
-          })}
-        </AnimatePresence>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {filter === 'offers' ? (
+          offers.map(offer => (
+            <div key={offer.id} className="bg-[#040d08] border border-emerald-500/20 rounded-[40px] p-10 flex flex-col justify-between group">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="h-14 w-14 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-2xl">{offer.deal?.logo || '🏢'}</div>
+                <h3 className="text-2xl">{offer.sender?.full_name}</h3>
+              </div>
+              <div className="flex gap-4">
+                <button onClick={() => setActiveOffer(offer)} className="flex-1 py-4 bg-white text-black rounded-2xl text-[10px] tracking-widest hover:bg-emerald-500 transition-all">REVIEW</button>
+                <button onClick={() => handleRejectOffer(offer.id)} className="px-6 py-4 bg-red-500/10 text-red-500 rounded-2xl text-[10px]">Reject</button>
+              </div>
+            </div>
+          ))
+        ) : (
+          brands.filter(b => filter === 'partners' ? b.isPartner : !b.isPartner).map(brand => (
+            <div key={brand.id} className="bg-[#040d08]/60 border border-white/5 rounded-[45px] p-10 flex flex-col items-center gap-6 group hover:border-emerald-500/30 transition-all">
+              <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-3xl">💎</div>
+              <h3 className="text-2xl text-center">{brand.full_name}</h3>
+              <button onClick={() => setSelectedBrand(brand)} disabled={brand.isPartner} className={`w-full py-5 rounded-[25px] text-[10px] tracking-widest italic font-black ${brand.isPartner ? 'bg-emerald-500/5 text-emerald-500' : 'bg-white text-black hover:bg-emerald-500'}`}>
+                {brand.isPartner ? 'Secured Node' : 'Initialize Connection'}
+              </button>
+            </div>
+          ))
+        )}
       </div>
+
+      <AnimatePresence>
+        {activeOffer && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 backdrop-blur-md">
+            <div className="absolute inset-0 bg-black/90" onClick={() => setActiveOffer(null)} />
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="relative bg-[#020502] border border-emerald-500/30 rounded-[60px] p-12 pt-16 max-w-md w-full shadow-2xl">
+              
+              <button onClick={() => setActiveOffer(null)} className="absolute top-8 right-8 h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-500 hover:text-white transition-all">X</button>
+
+              <div className="flex flex-col items-center text-center mb-8">
+                <div className="text-4xl mb-3 bg-white/5 p-4 rounded-3xl border border-white/10">{activeOffer.deal?.logo}</div>
+                <h2 className="text-3xl uppercase tracking-tighter">{activeOffer.sender?.full_name}</h2>
+                <p className="text-gray-500 text-[10px] tracking-[0.3em] uppercase mt-2">{activeOffer.deal?.title}</p>
+              </div>
+
+              <div className="text-center mb-10">
+                <h3 className="text-[100px] font-black italic tracking-tighter text-emerald-500 leading-none">
+                  {activeOffer.proposed_percentage}<span className="text-3xl not-italic font-light ml-1 text-white">%</span>
+                </h3>
+              </div>
+
+              {activeOffer.message && (
+                <div className="mb-10 bg-white/[0.02] border border-white/5 p-6 rounded-3xl text-center">
+                  <p className="text-sm text-gray-300 font-sans lowercase opacity-80 leading-relaxed italic">"{activeOffer.message}"</p>
+                </div>
+              )}
+
+              <div className="flex gap-4">
+                <button onClick={handleAcceptOffer} disabled={isSubmitting} className="flex-1 py-5 bg-emerald-500 text-black rounded-2xl text-[10px] tracking-widest hover:scale-105 transition-all font-black uppercase italic">
+                  Accept
+                </button>
+                <button onClick={() => handleRejectOffer(activeOffer.id)} disabled={isSubmitting} className="px-8 py-5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl text-[10px] font-black uppercase">
+                  Reject
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </main>
   )
 }

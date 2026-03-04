@@ -1,34 +1,27 @@
-import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
-import "../../globals.css";
-// ✅ გამოიყენე ეს იმპორტი (დარწმუნდი რომ წერტილები და გზა ზუსტია)
-import BrandSidebar from "../../../components/BrandSidebar";
+'use client'
 
-const inter = Inter({ subsets: ["latin"] });
+import BrandSidebar from '@/components/BrandSidebar'
+import BrandNavbar from '@/components/BrandNavbar'
 
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  themeColor: "#010201",
-};
-
-export const metadata: Metadata = {
-  title: "InfluX Brand | Portal",
-  description: "Secure Brand Management Node",
-};
-
-export default function BrandLayout({ children }: { children: React.ReactNode }) {
+export default function BrandLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <div className="flex min-h-screen bg-[#010201] text-white overflow-hidden font-sans">
-      {/* 🚀 Brand Specific Sidebar */}
+    <div className="min-h-screen bg-[#020202] text-white flex overflow-hidden">
+      {/* 🛠️ საიდბარი იტვირთება მხოლოდ აქ, ერთხელ */}
       <BrandSidebar />
-      
-      <main className="flex-1 min-w-0 h-screen overflow-y-auto scrollbar-hide relative bg-[radial-gradient(circle_at_top_right,#001529,transparent_40%)]">
-        {children}
-        <div className="fixed inset-0 pointer-events-none z-[9999] opacity-[0.03] bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay" />
-      </main>
+
+      <div className="flex-1 flex flex-col h-screen overflow-y-auto relative no-scrollbar">
+        {/* 🚀 ნავბარიც აქვეა, რომ ყველა გვერდზე გამოჩნდეს */}
+        <BrandNavbar />
+
+        {/* 📊 აქ ჩაიტვირთება კონკრეტული გვერდის (page.tsx) კონტენტი */}
+        <div className="pt-32 w-full">
+          {children}
+        </div>
+      </div>
     </div>
-  );
+  )
 }
