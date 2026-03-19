@@ -27,7 +27,7 @@ export default function UnifiedWallet() {
     <main className="min-h-screen bg-[#010201] text-white flex flex-col items-center p-4">
       
       <header className="w-full max-w-[340px] mt-10 mb-10 border-b border-white/5 pb-6 font-black italic uppercase text-center">
-        <h1 className="text-3xl tracking-tighter">InfluX <span className="text-emerald-500 text-glow">Wallet</span></h1>
+        <h1 className="text-3xl tracking-tighter">InfluX <span className="text-emerald-500 text-glow">TOKENS</span></h1>
       </header>
 
       <div className="w-full flex flex-col items-center gap-16 pb-20">
