@@ -42,8 +42,16 @@ function GridDealCard({ deal }: { deal: any }) {
   )
 }
 
+// 💠 ტიპების აღწერა (Interfaces)
+interface InfluXCardProps {
+  profile: any;
+  liveDeals: any[];
+  deal?: any; // 👈 აი ეს დავამატეთ, რომ [username] გვერდზე ერორი აღარ ამოაგდოს
+  children?: React.ReactNode;
+}
+
 // 💠 მთავარი კომპონენტი: InfluXCard
-export default function InfluXCard({ profile, liveDeals, children }: { profile: any, liveDeals: any[], children?: React.ReactNode }) {
+export default function InfluXCard({ profile, liveDeals, deal, children }: InfluXCardProps) {
   const [isFlipped, setIsFlipped] = useState(false)
   const x = useMotionValue(0), y = useMotionValue(0)
   const mouseXSpring = useSpring(x, { stiffness: 60, damping: 50 }), mouseYSpring = useSpring(y, { stiffness: 60, damping: 50 })
@@ -65,7 +73,6 @@ export default function InfluXCard({ profile, liveDeals, children }: { profile: 
                 <h3 className="text-3xl font-black italic uppercase text-white tracking-tighter leading-none text-glow text-center w-full px-4 break-words mt-6">{profile.full_name || 'SYNC NODE MASTER'}</h3>
               </div>
 
-              {/* 🚀 ABSOLUTE POSITIONING - აქედან ვეღარ გაიქცევა! */}
               <div className="absolute bottom-10 left-0 w-full flex justify-center z-20 pointer-events-none">
                 <p className="text-[10px] text-white/50 tracking-[0.4em] font-black uppercase leading-none animate-pulse">
                   Double Tap to Flip
@@ -85,16 +92,5 @@ export default function InfluXCard({ profile, liveDeals, children }: { profile: 
       </div>
       <div className="w-full relative z-20 mt-8">{children}</div>
     </div>
-
-    // დაახლოებით ასე უნდა გამოიყურებოდეს კომპონენტის დასაწყისი:
-interface InfluXCardProps {
-  profile?: any;
-  liveDeals?: any[];
-  deal?: any; // 👈 აი ეს დაამატეთ აქ
-}
-
-export default function InfluXCard({ profile, liveDeals, deal }: InfluXCardProps) {
-  // ...
-}
   )
 }
