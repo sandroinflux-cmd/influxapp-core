@@ -122,26 +122,33 @@ export default function BrandDealsPage() {
                 onClick={() => setFlippedId(flippedId === deal.id ? null : deal.id)}
               >
                 {/* 💠 FRONT */}
-                <div className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[60px] p-10 flex flex-col justify-between shadow-2xl group-hover:border-blue-500/40 overflow-hidden" style={{ backfaceVisibility: 'hidden' }}>
-                  <div className="flex flex-col items-center text-center -mt-2">
-                    <div className="h-28 w-28 md:h-32 md:w-32 rounded-full bg-white/[0.03] border-2 border-white/10 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(255,255,255,0.05)] overflow-hidden">
+                <div className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[60px] p-8 flex flex-col justify-between shadow-2xl group-hover:border-blue-500/40 overflow-hidden" style={{ backfaceVisibility: 'hidden' }}>
+                  
+                  {/* 🖼️ AVATAR & NAME SECTION */}
+                  <div className="flex flex-col items-center text-center w-full mt-2">
+                    {/* ✅ 20%-ით შემცირებული ლოგოს კონტეინერი */}
+                    <div className="h-32 w-32 md:h-40 md:w-40 mx-auto rounded-[32px] bg-white/[0.03] border-2 border-white/10 flex items-center justify-center mb-6 shadow-lg overflow-hidden relative">
                       {deal.logo?.startsWith('http') ? (
-                        <img src={deal.logo} alt={deal.title} className="h-full w-full object-cover" />
+                        <img src={deal.logo} alt={deal.title} className="absolute inset-0 h-full w-full object-cover filter brightness-105" />
                       ) : (
-                        <span className="text-4xl">{deal.logo}</span>
+                        // ✅ დაპატარავებული ტექსტური ლოგო
+                        <span className="text-5xl">{deal.logo}</span>
                       )}
                     </div>
-                    <h3 className="text-lg md:text-2xl font-black text-white italic uppercase tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">{deal.title}</h3>
-                  </div>
-
-                  <div className="text-center -mt-8">
-                    <h3 className="text-8xl md:text-[130px] font-black italic tracking-tighter text-white group-hover:text-blue-500 transition-colors leading-none">
-                      {deal.totalShare}<span className="text-xl md:text-2xl not-italic font-light ml-1">%</span>
+                    {/* 📝 გაზრდილი სათაური */}
+                    <h3 className="text-3xl md:text-4xl font-black text-white italic uppercase tracking-tighter leading-none drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
+                      {deal.title}
                     </h3>
                   </div>
 
-                  <div className="text-center opacity-20 italic">
-                    <p className="text-[7px] font-black uppercase tracking-[0.5em]">Tap to Inspect</p>
+                  <div className="text-center mt-auto">
+                    <h3 className="text-8xl md:text-[110px] font-black italic tracking-tighter text-white group-hover:text-blue-500 transition-colors leading-none">
+                      {deal.totalShare}<span className="text-2xl md:text-3xl not-italic font-light ml-1">%</span>
+                    </h3>
+                  </div>
+
+                  <div className="text-center opacity-30 italic mt-6 pb-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.5em] animate-pulse">Double Tap to Flip</p>
                   </div>
                 </div>
 
@@ -171,7 +178,7 @@ export default function BrandDealsPage() {
                     </div>
                   </div>
 
-                  {/* ✅ გაზრდილი Bio/Mission ბლოკი */}
+                  {/* ✅ Bio/Mission ბლოკი */}
                   <div className="bg-white/[0.04] border border-white/10 rounded-[35px] p-8 mt-2 shadow-inner">
                     <span className="text-[7px] font-black text-blue-500 uppercase tracking-[0.4em] block mb-4 italic">Message / Intel</span>
                     <p className="text-lg font-black text-white uppercase leading-tight italic tracking-tighter">

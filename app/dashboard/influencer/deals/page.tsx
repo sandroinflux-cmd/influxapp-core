@@ -119,34 +119,36 @@ export default function MyDealsPage() {
               transition={{ duration: 0.6, type: "spring", stiffness: 200, damping: 20 }} 
               onClick={() => setFlippedId(flippedId === item.id ? null : item.id)}
             >
-              {/* 💠 FRONT SIDE - სრულად იდენტური ბრენდის გვერდის */}
+              {/* 💠 FRONT SIDE - ზუსტი ასლი Brand Deals-ის */}
               <div 
-                className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[60px] p-10 flex flex-col justify-between shadow-2xl group-hover:border-emerald-500/40 transition-colors duration-500 overflow-hidden" 
+                className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[60px] p-8 flex flex-col justify-between shadow-2xl group-hover:border-emerald-500/40 transition-colors duration-500 overflow-hidden" 
                 style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
               >
-                <div className="flex flex-col items-center text-center -mt-2">
-                  <div className="h-28 w-28 md:h-32 md:w-32 rounded-full bg-white/[0.03] border-2 border-white/10 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(255,255,255,0.05)] overflow-hidden">
+                {/* 🖼️ AVATAR & NAME SECTION */}
+                <div className="flex flex-col items-center text-center w-full mt-2">
+                  <div className="h-32 w-32 md:h-40 md:w-40 mx-auto rounded-[32px] bg-white/[0.03] border-2 border-white/10 flex items-center justify-center mb-6 shadow-lg overflow-hidden relative">
                     {item.deals?.logo?.startsWith('http') ? (
-                      <img src={item.deals.logo} alt={item.deals.title} className="h-full w-full object-cover" />
+                      <img src={item.deals.logo} alt={item.deals.title} className="absolute inset-0 h-full w-full object-cover filter brightness-105" />
                     ) : (
-                      <span className="text-4xl">{item.deals?.logo || '💠'}</span>
+                      <span className="text-5xl">{item.deals?.logo || '💠'}</span>
                     )}
                   </div>
-                  <h3 className="text-lg md:text-2xl font-black text-white italic uppercase tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
+                  {/* 📝 გაზრდილი სათაური */}
+                  <h3 className="text-3xl md:text-4xl font-black text-white italic uppercase tracking-tighter leading-none drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
                     {item.deals?.title}
                   </h3>
                 </div>
 
-                <div className="text-center -mt-8">
-                  <h3 className="text-8xl md:text-[130px] font-black italic tracking-tighter text-white group-hover:text-emerald-500 transition-colors leading-none drop-shadow-[0_0_30px_rgba(0,0,0,0.5)]">
-                    {item.deals?.totalShare || 0}<span className="text-xl md:text-2xl not-italic font-light ml-1 opacity-40">%</span>
+                <div className="text-center mt-auto">
+                  <h3 className="text-8xl md:text-[110px] font-black italic tracking-tighter text-white group-hover:text-emerald-500 transition-colors leading-none drop-shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+                    {item.deals?.totalShare || 0}<span className="text-2xl md:text-3xl not-italic font-light ml-1 opacity-40">%</span>
                   </h3>
                 </div>
 
-                {/* 🚀 Hover ღილაკი დაიზოლირებულია აბსოლუტურ პოზიციაში */}
-                <div className="relative w-full h-8 flex justify-center items-end">
-                  <div className="text-center opacity-20 italic absolute transition-opacity duration-300 group-hover:opacity-0">
-                    <p className="text-[7px] font-black uppercase tracking-[0.5em]">Tap to Inspect</p>
+                {/* 🚀 Hover ღილაკი & Double Tap (იზოლირებული) */}
+                <div className="relative w-full h-12 flex justify-center items-end pb-2">
+                  <div className="text-center opacity-30 italic absolute transition-opacity duration-300 group-hover:opacity-0">
+                    <p className="text-[8px] font-black uppercase tracking-[0.5em] animate-pulse">Double Tap to Flip</p>
                   </div>
                   
                   <div className="opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-4 group-hover:translate-y-0 absolute w-full z-20">
@@ -164,12 +166,13 @@ export default function MyDealsPage() {
                 </div>
               </div>
 
-              {/* 💠 BACK SIDE */}
+              {/* 💠 BACK SIDE (Passport Style) - ზუსტი ასლი Brand Deals-ის */}
               <div 
                 className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[60px] p-12 flex flex-col justify-between shadow-2xl" 
                 style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
               >
                 <div className="space-y-8 font-black italic uppercase leading-none">
+                  {/* ✅ "ABOUT BRAND" სათაური */}
                   <h4 className="text-[10px] text-emerald-500 tracking-[0.6em] border-b border-white/10 pb-4">About Brand</h4>
                   
                   <div className="space-y-6">
@@ -187,13 +190,14 @@ export default function MyDealsPage() {
                       </p>
                     </div>
                   </div>
+                </div>
 
-                  <div className="bg-white/[0.04] border border-white/10 rounded-[35px] p-8 mt-2 shadow-inner">
-                    <span className="text-[7px] text-emerald-500 tracking-[0.4em] block mb-4">Message / Intel</span>
-                    <p className="text-lg text-white leading-tight tracking-tighter">
-                      {item.deals?.intel?.phone || 'Mission intel remains classified.'}
-                    </p>
-                  </div>
+                {/* ✅ Bio/Mission ბლოკი */}
+                <div className="bg-white/[0.04] border border-white/10 rounded-[35px] p-8 mt-2 shadow-inner">
+                  <span className="text-[7px] text-emerald-500 tracking-[0.4em] block mb-4 italic font-black uppercase">Message / Intel</span>
+                  <p className="text-lg text-white leading-tight tracking-tighter italic font-black uppercase">
+                    {item.deals?.intel?.phone || 'Mission intel remains classified.'}
+                  </p>
                 </div>
               </div>
             </motion.div>

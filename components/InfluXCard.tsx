@@ -3,36 +3,68 @@
 import { useState } from 'react'
 import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
 
+// ✅ განახლებული GridDealCard Intel-ის მხარდაჭერით
 function GridDealCard({ deal }: { deal: any }) {
   const [isGridCardFlipped, setIsGridCardFlipped] = useState(false)
+  
   return (
     <motion.div 
-      className="relative cursor-pointer h-full"
+      className="relative cursor-pointer h-[240px]" // ფიქსირებული სიმაღლე გრიდისთვის
       style={{ transformStyle: 'preserve-3d', perspective: "1000px" }}
       animate={{ rotateY: isGridCardFlipped ? 180 : 0 }}
       transition={{ duration: 0.6, type: "spring", stiffness: 200, damping: 20 }}
       onClick={(e) => { e.stopPropagation(); setIsGridCardFlipped(!isGridCardFlipped); }}
     >
+      {/* 💠 FRONT SIDE */}
       <div 
-        className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[45px] p-6 flex flex-col justify-between shadow-inner relative overflow-hidden group/deal" 
+        className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[35px] p-5 flex flex-col justify-between shadow-inner relative overflow-hidden group/deal" 
         style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'translateZ(1px)' }}
       >
         <div className="flex flex-col items-center gap-2 relative z-10 text-center">
-            <div className="h-12 w-12 rounded-full bg-white/[0.03] border-2 border-white/10 flex items-center justify-center overflow-hidden">
-               {deal.logo?.startsWith('http') ? <img src={deal.logo} alt="brand" className="h-full w-full object-cover" /> : <span className="text-xl">{deal.logo || '💎'}</span>}
+            <div className="h-12 w-12 rounded-2xl bg-white/[0.03] border-2 border-white/10 flex items-center justify-center overflow-hidden">
+               {deal.logo?.startsWith('http') 
+                  ? <img src={deal.logo} alt="brand" className="h-full w-full object-cover" /> 
+                  : <span className="text-xl">{deal.logo || '💎'}</span>}
             </div>
-            <h3 className="text-[9px] text-white tracking-widest truncate w-full opacity-60 uppercase font-black italic">{deal.brand}</h3>
+            <h3 className="text-[8px] text-white tracking-widest truncate w-full opacity-60 uppercase font-black italic mt-1">
+              {deal.brand}
+            </h3>
         </div>
-        <h2 className="text-4xl text-center py-4 text-emerald-500 text-glow leading-none relative z-10 tracking-tighter uppercase font-black italic">{deal.offer}</h2>
-        <div className="text-[7px] text-gray-700 text-center tracking-[0.4em] uppercase font-black italic">Tap to INSPECT</div>
+        
+        <h2 className="text-4xl text-center py-2 text-emerald-500 text-glow leading-none relative z-10 tracking-tighter uppercase font-black italic">
+          {deal.offer}
+        </h2>
+        
+        <div className="text-[6px] text-gray-700 text-center tracking-[0.3em] uppercase font-black italic opacity-0 group-hover/deal:opacity-100 transition-opacity">
+          Tap to INSPECT
+        </div>
       </div>
+
+      {/* 💠 BACK SIDE (Passport Intel Style) */}
       <div 
-        className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[45px] p-8 flex flex-col justify-between shadow-inner" 
+        className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[35px] p-5 flex flex-col justify-between shadow-inner" 
         style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg) translateZ(1px)' }}
       >
-        <div className="space-y-4 text-center italic font-black uppercase leading-none">
-           <div className="border-b border-white/10 pb-2"><h4 className="text-[10px] text-emerald-500 tracking-[0.5em]">INTEL</h4></div>
-           <p className="text-xs text-white">{deal.backIntelPhone || 'CLASSIFIED'}</p>
+        <div className="space-y-3 font-black italic uppercase leading-none">
+          <h4 className="text-[8px] text-emerald-500 tracking-[0.4em] border-b border-white/10 pb-2 text-center">Brand Intel</h4>
+          
+          <div className="space-y-2">
+            <div>
+              <span className="text-[6px] text-gray-600 tracking-widest block mb-0.5">Sector</span>
+              <p className="text-[10px] text-white truncate">{deal.intel?.type || 'Active Node'}</p>
+            </div>
+            <div>
+              <span className="text-[6px] text-gray-600 tracking-widest block mb-0.5">Location</span>
+              <p className="text-[10px] text-white truncate">{deal.intel?.location || 'Digital'}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white/[0.04] border border-white/10 rounded-[15px] p-3 shadow-inner">
+          <span className="text-[5px] text-emerald-500 tracking-[0.3em] block mb-1 font-black uppercase">Message</span>
+          <p className="text-[9px] text-white leading-tight italic font-black uppercase line-clamp-3">
+            {deal.backIntelPhone || deal.intel?.phone || 'Classified.'}
+          </p>
         </div>
       </div>
     </motion.div>
@@ -57,7 +89,6 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
 
   if (!profile && !deal) return null
 
-  // ვაცალკევებთ სახელს და გვარს
   const nameParts = (profile?.full_name || deal?.brands?.name || 'SYNC NODE').split(' ');
   const firstName = nameParts[0];
   const lastName = nameParts.slice(1).join(' ');
@@ -82,7 +113,6 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
           >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98110,transparent_75%)] pointer-events-none" />
               
-              {/* 🖼️ AVATAR */}
               <div className="w-full relative flex flex-col items-center z-10">
                 {profile?.avatar_url && (
                   <motion.img 
@@ -93,21 +123,18 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
                   />
                 )}
                 
-                {/* 📝 NAME */}
                 <h3 className="font-black italic uppercase text-white tracking-tighter leading-[0.85] text-glow text-center w-full px-2 mt-7 flex flex-col">
                   <span className="text-[34px]">{firstName}</span>
                   {lastName && <span className="text-[34px]">{lastName}</span>}
                 </h3>
               </div>
 
-              {/* 🚀 TEXT: აბსოლუტური პოზიცია, ღილაკის ზემოთ */}
               <div className="absolute bottom-[90px] left-0 w-full flex justify-center z-20 pointer-events-none">
                 <p className="text-[10px] text-white/50 tracking-[0.4em] font-black uppercase animate-pulse">
                   Double Tap to Flip
                 </p>
               </div>
 
-              {/* 🚀 BUTTON: აბსოლუტური პოზიცია, მაქსიმალურად ახლოს ქვედა კიდესთან (bottom-4 ნიშნავს 16px-ს კიდიდან) */}
               {children && (
                 <div className="absolute bottom-5 left-0 w-full flex justify-center z-30">
                   {children}
@@ -120,9 +147,15 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
             className="absolute inset-0 bg-[#010201] border-2 border-white/10 rounded-[45px] overflow-hidden" 
             style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg) translateZ(1px)" }}
           >
-            <div className="w-full h-full p-6 pt-8 overflow-y-auto scrollbar-hide">
-              <div className="grid grid-cols-2 gap-3">
-                {liveDeals.map((d) => <GridDealCard key={d.id} deal={d} />)}
+            <div className="w-full h-full p-6 pt-8 overflow-y-auto scrollbar-hide bg-[radial-gradient(circle_at_0%_0%,#ffffff03,transparent_60%)]">
+              <div className="grid grid-cols-2 gap-3 pb-4">
+                {liveDeals.length > 0 ? liveDeals.map((d) => (
+                  <GridDealCard key={d.id} deal={d} />
+                )) : (
+                  <div className="col-span-2 text-center py-20 opacity-20 font-black italic uppercase text-[10px] tracking-widest">
+                    No Deals Linked
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -60,7 +60,6 @@ export default function InfluencerMarketplace() {
     fetchData()
   }
 
-  // ✅ გასწორებული Accept ფუნქცია - ახლა უკვე მუშაობს!
   const handleAcceptOffer = async () => {
     setIsSubmitting(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -110,12 +109,19 @@ export default function InfluencerMarketplace() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {filter === 'offers' ? (
           offers.map(offer => (
-            <div key={offer.id} className="bg-[#040d08] border border-emerald-500/20 rounded-[40px] p-10 flex flex-col justify-between group">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="h-14 w-14 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center justify-center text-2xl">{offer.deal?.logo || '🏢'}</div>
-                <h3 className="text-2xl">{offer.sender?.full_name}</h3>
+            <div key={offer.id} className="bg-[#040d08] border border-emerald-500/20 rounded-[40px] p-8 flex flex-col justify-between group">
+              <div className="flex flex-col items-center gap-4 mb-6">
+                {/* ✅ ლოგოს სწორი რენდერი ბარათზე */}
+                <div className="h-28 w-28 rounded-[24px] bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden relative shadow-lg">
+                   {offer.deal?.logo?.startsWith('http') ? (
+                     <img src={offer.deal.logo} alt="" className="absolute inset-0 h-full w-full object-cover filter brightness-105" />
+                   ) : (
+                     <span className="text-5xl">{offer.deal?.logo || '🏢'}</span>
+                   )}
+                </div>
+                <h3 className="text-2xl text-center leading-none mt-2">{offer.sender?.full_name}</h3>
               </div>
-              <div className="flex gap-4">
+              <div className="flex gap-4 w-full">
                 <button onClick={() => setActiveOffer(offer)} className="flex-1 py-4 bg-white text-black rounded-2xl text-[10px] tracking-widest hover:bg-emerald-500 transition-all">REVIEW</button>
                 <button onClick={() => handleRejectOffer(offer.id)} className="px-6 py-4 bg-red-500/10 text-red-500 rounded-2xl text-[10px]">Reject</button>
               </div>
@@ -143,14 +149,21 @@ export default function InfluencerMarketplace() {
               <button onClick={() => setActiveOffer(null)} className="absolute top-8 right-8 h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-500 hover:text-white transition-all">X</button>
 
               <div className="flex flex-col items-center text-center mb-8">
-                <div className="text-4xl mb-3 bg-white/5 p-4 rounded-3xl border border-white/10">{activeOffer.deal?.logo}</div>
-                <h2 className="text-3xl uppercase tracking-tighter">{activeOffer.sender?.full_name}</h2>
-                <p className="text-gray-500 text-[10px] tracking-[0.3em] uppercase mt-2">{activeOffer.deal?.title}</p>
+                {/* ✅ ლოგოს სწორი რენდერი REVIEW ფანჯარაში */}
+                <div className="w-32 h-32 mb-6 bg-white/[0.03] rounded-[28px] border border-white/10 flex items-center justify-center overflow-hidden relative shadow-[0_0_40px_rgba(16,185,129,0.15)]">
+                   {activeOffer.deal?.logo?.startsWith('http') ? (
+                     <img src={activeOffer.deal.logo} alt="" className="absolute inset-0 h-full w-full object-cover filter brightness-105" />
+                   ) : (
+                     <span className="text-6xl">{activeOffer.deal?.logo || '🏢'}</span>
+                   )}
+                </div>
+                <h2 className="text-4xl uppercase tracking-tighter leading-none mb-2">{activeOffer.sender?.full_name}</h2>
+                <p className="text-emerald-500 text-[10px] tracking-[0.4em] uppercase mt-2">{activeOffer.deal?.title}</p>
               </div>
 
               <div className="text-center mb-10">
-                <h3 className="text-[100px] font-black italic tracking-tighter text-emerald-500 leading-none">
-                  {activeOffer.proposed_percentage}<span className="text-3xl not-italic font-light ml-1 text-white">%</span>
+                <h3 className="text-[110px] font-black italic tracking-tighter text-white leading-none drop-shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                  {activeOffer.proposed_percentage}<span className="text-4xl not-italic font-light ml-1 text-emerald-500">%</span>
                 </h3>
               </div>
 
@@ -161,10 +174,10 @@ export default function InfluencerMarketplace() {
               )}
 
               <div className="flex gap-4">
-                <button onClick={handleAcceptOffer} disabled={isSubmitting} className="flex-1 py-5 bg-emerald-500 text-black rounded-2xl text-[10px] tracking-widest hover:scale-105 transition-all font-black uppercase italic">
-                  Accept
+                <button onClick={handleAcceptOffer} disabled={isSubmitting} className="flex-1 py-5 bg-emerald-500 text-black rounded-3xl text-[11px] tracking-widest hover:scale-105 transition-all font-black uppercase italic shadow-[0_0_30px_rgba(16,185,129,0.4)]">
+                  Accept Deal
                 </button>
-                <button onClick={() => handleRejectOffer(activeOffer.id)} disabled={isSubmitting} className="px-8 py-5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl text-[10px] font-black uppercase">
+                <button onClick={() => handleRejectOffer(activeOffer.id)} disabled={isSubmitting} className="px-8 py-5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-3xl text-[11px] font-black uppercase hover:bg-red-500 hover:text-white transition-all">
                   Reject
                 </button>
               </div>

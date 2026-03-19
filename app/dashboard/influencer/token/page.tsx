@@ -14,7 +14,7 @@ function GridDealCard({ deal }: { deal: any }) {
       style={{ transformStyle: 'preserve-3d', perspective: "1000px" }}
       animate={{ rotateY: isGridCardFlipped ? 180 : 0 }}
       transition={{ duration: 0.6, type: "spring", stiffness: 200, damping: 20 }}
-      onClick={() => setIsGridCardFlipped(!isGridCardFlipped)}
+      onClick={(e) => { e.stopPropagation(); setIsGridCardFlipped(!isGridCardFlipped); }}
     >
       {/* 💠 FRONT DEAL SIDE */}
       <div 
@@ -22,39 +22,60 @@ function GridDealCard({ deal }: { deal: any }) {
         style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
       >
         <div className="absolute inset-0 bg-emerald-500/[0.01] opacity-0 group-hover/deal:opacity-100 transition-opacity blur-xl rounded-full" />
-        <div className="flex flex-col items-center gap-2 relative z-10 text-center">
-            <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-white/[0.03] border-2 border-white/10 flex items-center justify-center mb-1 shadow-inner overflow-hidden">
-               {deal.logo?.startsWith('http') 
-                  ? <img src={deal.logo} alt="brand" className="h-full w-full object-cover" /> 
-                  : <span className="text-xl md:text-2xl">{deal.logo}</span>}
-            </div>
-            <h3 className="text-[10px] md:text-[11px] text-white tracking-widest truncate w-full text-center leading-none opacity-60 mt-1 uppercase font-black italic">{deal.brand}</h3>
+        
+        {/* 🖼️ AVATAR & NAME SECTION (გაზრდილი, Brand Deals სტილში) */}
+        <div className="flex flex-col items-center text-center w-full mt-2 relative z-10">
+          <div className="h-14 w-14 md:h-16 md:w-16 mx-auto rounded-2xl bg-white/[0.03] border-2 border-white/10 flex items-center justify-center mb-3 shadow-lg overflow-hidden relative">
+            {deal.logo?.startsWith('http') ? (
+              <img src={deal.logo} alt={deal.brand} className="absolute inset-0 h-full w-full object-cover filter brightness-105" />
+            ) : (
+              <span className="text-2xl">{deal.logo || '💠'}</span>
+            )}
+          </div>
+          <h3 className="text-[10px] md:text-[12px] font-black text-white italic uppercase tracking-widest leading-none drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">
+            {deal.brand}
+          </h3>
         </div>
-        <h2 className="text-5xl md:text-6xl text-center py-4 text-emerald-500 text-glow leading-none relative z-10 tracking-tighter uppercase font-black italic">{deal.offer}</h2>
+
+        <h2 className="text-5xl md:text-6xl text-center py-4 text-emerald-500 text-glow leading-none relative z-10 tracking-tighter uppercase font-black italic">
+          {deal.offer}
+        </h2>
+        
         <div className="relative z-10 opacity-0 group-hover/deal:opacity-100 transition-opacity">
-           <button className="text-[7px] text-gray-700 pt-3 text-center tracking-[0.4em] leading-none uppercase font-black italic hover:text-emerald-500 transition-colors">Tap to INSPECT INTEL</button>
+           <button className="text-[7px] text-gray-700 pt-3 text-center tracking-[0.4em] leading-none uppercase font-black italic hover:text-emerald-500 transition-colors w-full">Tap to INSPECT INTEL</button>
         </div>
       </div>
 
-      {/* 💠 BACK DEAL SIDE */}
+      {/* 💠 BACK DEAL SIDE (Passport Style, მორგებული პატარა ბარათზე) */}
       <div 
-        className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[45px] p-8 flex flex-col justify-between shadow-inner" 
+        className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[45px] p-6 flex flex-col justify-between shadow-inner" 
         style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
       >
-        <div className="space-y-6 text-center italic font-black uppercase leading-none break-words">
-           <div className="border-b border-white/10 pb-4 mb-2">
-             <h4 className="text-[11px] text-emerald-500 tracking-[0.5em]">AUTH NODE INTEL</h4>
-           </div>
-           <div className="space-y-3 px-2">
-             <div className="group/item">
-                <span className="text-[8px] text-gray-600 uppercase tracking-widest block mb-1 italic">INTEL PHONE</span>
-                <p className="text-md text-white">{deal.backIntelPhone || 'CLASSIFIED'}</p>
-             </div>
-             <div className="group/item">
-                <span className="text-[8px] text-gray-600 uppercase tracking-widest block mb-1 italic">Status</span>
-                <p className="text-md text-emerald-500">SECURED</p>
-             </div>
-           </div>
+        <div className="space-y-4 font-black italic uppercase leading-none">
+          <h4 className="text-[9px] text-emerald-500 tracking-[0.5em] border-b border-white/10 pb-2">About Brand</h4>
+          
+          <div className="space-y-3">
+            <div className="group/item">
+              <span className="text-[7px] text-gray-600 tracking-widest block mb-1">Sector Node</span>
+              <p className="text-sm text-white leading-none truncate">
+                {deal.intel?.type || 'Active Venture'}
+              </p>
+            </div>
+
+            <div className="group/item">
+              <span className="text-[7px] text-gray-600 tracking-widest block mb-1">HQ Location</span>
+              <p className="text-sm text-white leading-none truncate">
+                {deal.intel?.location || 'Digital Node'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white/[0.04] border border-white/10 rounded-[20px] p-4 mt-2 shadow-inner">
+          <span className="text-[6px] text-emerald-500 tracking-[0.4em] block mb-2 italic font-black uppercase">Message / Intel</span>
+          <p className="text-[10px] text-white leading-tight tracking-tighter italic font-black uppercase line-clamp-3">
+            {deal.backIntelPhone || deal.intel?.phone || 'Mission intel remains classified.'}
+          </p>
         </div>
       </div>
     </motion.div>
@@ -93,7 +114,8 @@ export default function TokenForge() {
           brand: d.deals?.title || 'MATRIX NODE',
           offer: `${d.user_discount_pct || 0}% OFF`,
           logo: d.deals?.logo || '💎',
-          backIntelPhone: d.deals?.intel?.phone || 'Secret Node'
+          backIntelPhone: d.deals?.intel?.phone || 'Secret Node',
+          intel: d.deals?.intel || {} // ვამატებთ მთლიან intel ობიექტს
         })))
       }
     } catch (err: any) { console.error(err) }
@@ -108,7 +130,6 @@ export default function TokenForge() {
   // ✅ ✅ ✅ ლინკის გაზიარების ლოგიკა
   const handleDeployLink = () => {
     if (!profile) return
-    // ლინკის ფორმატი: დომენი + ქლეიმ ფეიჯი + ინფლუენსერის ID
     const deployUrl = `${window.location.origin}/claim?ref=${profile.id}`
     navigator.clipboard.writeText(deployUrl)
     setIsCopied(true)
@@ -126,7 +147,7 @@ export default function TokenForge() {
            <h1 className="text-7xl tracking-tighter uppercase leading-none font-black italic">Token</h1>
         </div>
         
-        {/* ✅ ✅ ✅ Deployment Button (NEW) */}
+        {/* ✅ ✅ ✅ Deployment Button */}
         <button 
           onClick={handleDeployLink}
           className={`mt-4 px-10 py-4 rounded-full border-2 transition-all duration-500 font-black text-[10px] uppercase tracking-[0.3em] italic ${isCopied ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10' : 'border-white/10 hover:border-emerald-500/40 bg-white/5'}`}

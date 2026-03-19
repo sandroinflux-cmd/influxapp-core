@@ -50,7 +50,6 @@ export default function PaymentFlowPage() {
       })
     }
 
-    // პრევენცია სკანერის ერორებისთვის
     setTimeout(() => {
       setStep('amount')
     }, 150)
@@ -58,20 +57,22 @@ export default function PaymentFlowPage() {
 
   // 💸 2. როცა იუზერი თანხას ჩაწერს და იხდის
   const handlePaymentConfirm = async (finalPayable: number) => {
-    // 🛡️ MATRIX FIX: ვუზრუნველყოფთ, რომ deal_id იყოს ვალიდური UUID ან null
     const currentDealId = activeDeal?.deal_id || activeDeal?.id || null;
-    
     const discountPct = activeDeal?.user_discount_pct || 0;
+    
+    // 🧮 გამოთვლა: ვიგებთ საწყის თანხას (რაც მომხმარებელმა შეიყვანა)
     const rawAmount = discountPct < 100 
       ? (finalPayable / (1 - (discountPct / 100))) 
       : finalPayable;
 
-    // 💾 ვინახავთ ტრანზაქციას Supabase-ში
+    // 💾 შენახვა Supabase-ში ახალი ველის (bill_amount) ჩათვლით
     const { data, error } = await supabase
       .from('transactions')
       .insert([{
-        amount: Number(rawAmount.toFixed(2)), 
-        deal_id: currentDealId, // 🚀 ახლა უკვე უსაფრთხოდ აწვდის UUID-ს
+        amount: Number(rawAmount.toFixed(2)),       // საწყისი (თავსებადობისთვის)
+        bill_amount: Number(rawAmount.toFixed(2)),  // 🚀 ექსკლუზიურად მოლარის მონიტორისთვის!
+        final_amount: Number(finalPayable.toFixed(2)), // რეალურად გადახდილი
+        deal_id: currentDealId,
         brand_id: scannedBrand,
         influencer_id: activeDeal?.influencer_id || null,
         status: 'success'
@@ -81,7 +82,6 @@ export default function PaymentFlowPage() {
 
     if (error) {
       console.error("Matrix Sync Error:", error.message);
-      // თუ მაინც ამოაგდო ოპერატორის ერორი, ნიშნავს რომ SQL ფუნქციაში ::UUID აკლია
       alert("გადახდა ვერ მოხერხდა: " + error.message);
       return;
     }
@@ -89,8 +89,9 @@ export default function PaymentFlowPage() {
     setTxData({ finalPayable, rawAmount });
     setStep('receipt');
 
+    // ლოკალური ისტორიის განახლება
     const newTx = {
-      id: Date.now(),
+      id: data.id,
       brandName: activeDeal?.deals?.title || activeDeal?.brand_name || 'Matrix Partner',
       paid: finalPayable,
       saved: Number((rawAmount - finalPayable).toFixed(2)),
@@ -114,7 +115,6 @@ export default function PaymentFlowPage() {
             <h1 className="text-2xl font-black italic tracking-tighter uppercase">Initialize <span className="text-emerald-500">Node</span></h1>
             <p className="text-[10px] text-gray-500 tracking-[0.2em] uppercase">Scan physical access point</p>
           </div>
-          {/* @ts-ignore */}
           <QRScanner 
              onScanSuccess={handleScanSuccess} 
              onScanError={(err: any) => console.log("Scan Note:", err)} 

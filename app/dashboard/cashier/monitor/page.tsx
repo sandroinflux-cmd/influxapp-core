@@ -14,59 +14,48 @@ function MonitorContent() {
   const [history, setHistory] = useState<any[]>([])
   const [status, setStatus] = useState<'scanning' | 'success'>('scanning')
 
-  // 🔊 Web Audio API - სინთეზირებული "Tick" ხმა (არანაირი გარე ფაილი)
   const playPulseTick = () => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const osc = audioCtx.createOscillator()
-      const gain = audioCtx.createGain()
-
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(1200, audioCtx.currentTime)
-      osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1)
-
-      gain.gain.setValueAtTime(0.1, audioCtx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1)
-
-      osc.connect(gain)
-      gain.connect(audioCtx.destination)
-
-      osc.start()
-      osc.stop(audioCtx.currentTime + 0.1)
-    } catch (e) {
-      console.error("Audio Engine Error:", e)
-    }
+      const playSharpTick = (freq: number, start: number, volume: number) => {
+        const osc = audioCtx.createOscillator()
+        const gain = audioCtx.createGain()
+        osc.type = 'square'
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + start)
+        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + start + 0.1)
+        gain.gain.setValueAtTime(volume, audioCtx.currentTime + start)
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + start + 0.1)
+        osc.connect(gain)
+        gain.connect(audioCtx.destination)
+        osc.start(audioCtx.currentTime + start)
+        osc.stop(audioCtx.currentTime + start + 0.1)
+      }
+      playSharpTick(2500, 0, 0.5)
+      playSharpTick(3200, 0.06, 0.4)
+    } catch (e) { console.error(e) }
   }
 
   useEffect(() => {
     if (!isActive || !brandId) return
 
-    // 📡 მხოლოდ ამ ბრენდის ტრანზაქციების მოსმენა რეალურ დროში
     const channel = supabase
       .channel(`terminal-${brandId}`)
       .on(
         'postgres_changes',
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'transactions',
-          filter: `brand_id=eq.${brandId}` 
-        },
+        { event: 'INSERT', schema: 'public', table: 'transactions', filter: `brand_id=eq.${brandId}` },
         (payload) => {
+          const now = new Date();
           const txData = {
             ...payload.new,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            exactTime: now.toLocaleTimeString('ka-GE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
           }
           
           playPulseTick()
           setLastPayment(txData)
-          setHistory(prev => [txData, ...prev].slice(0, 8))
+          setHistory(prev => [txData, ...prev].slice(0, 10))
           setStatus('success')
 
-          // ⚡️ თანხა რჩება 30 წამი
-          setTimeout(() => {
-            setStatus('scanning')
-          }, 30000)
+          setTimeout(() => { setStatus('scanning') }, 40000)
         }
       )
       .subscribe()
@@ -74,144 +63,101 @@ function MonitorContent() {
     return () => { supabase.removeChannel(channel) }
   }, [isActive, brandId])
 
-  // Error State: თუ ბმული ბრენდის ID-ის გარეშეა
-  if (!brandId) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-10">
-        <div className="text-center space-y-4">
-          <p className="text-red-500 font-black uppercase text-[10px] tracking-[0.5em] italic">Access Denied</p>
-          <p className="text-gray-600 text-xs font-bold uppercase tracking-widest leading-relaxed">
-            Missing Brand Protocol ID.<br />Please use the link provided in Brand Settings.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  if (!brandId) return <div className="min-h-screen bg-black" />
 
-  // 🛡️ Interaction Gate: ბრაუზერის ხმის პოლიტიკის გამო
   if (!isActive) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-12">
-        <div className="text-center space-y-4">
-          <div className="h-1 w-24 bg-blue-500/10 mx-auto rounded-full overflow-hidden relative">
-            <motion.div 
-              animate={{ left: ["-100%", "100%"] }} 
-              transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-              className="absolute h-full w-1/2 bg-blue-500 shadow-[0_0_20px_#3b82f6]" 
-            />
-          </div>
-          <h1 className="text-white/20 font-black text-[10px] uppercase tracking-[1em] italic">Matrix Terminal v3.0</h1>
-        </div>
-        <button 
-          onClick={() => setIsActive(true)}
-          className="bg-white text-black px-20 py-8 rounded-[40px] font-black text-xs uppercase tracking-[0.5em] italic hover:bg-blue-600 hover:text-white transition-all active:scale-95 shadow-2xl"
-        >
-          Initialize Sync
+      <div className="min-h-screen bg-[#010201] flex items-center justify-center">
+        <button onClick={() => setIsActive(true)} className="bg-emerald-600 text-white px-24 py-10 rounded-[45px] font-black text-xl uppercase tracking-[0.5em] italic shadow-[0_0_60px_rgba(16,185,129,0.3)] border-2 border-white/10">
+          Initialize Terminal
         </button>
       </div>
     )
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-1000 flex flex-col p-8 md:p-16 ${
-      status === 'success' ? 'bg-[#030a06]' : 'bg-[#010201]'
-    }`}>
+    <div className={`min-h-screen transition-colors duration-1000 flex flex-col p-8 md:p-16 ${status === 'success' ? 'bg-[#030a06]' : 'bg-[#010201]'}`}>
       
-      {/* 📡 Header / Status Area */}
-      <header className="flex justify-between items-start w-full max-w-7xl mx-auto">
+      <header className="flex justify-between items-start w-full max-w-7xl mx-auto z-10">
         <div className="space-y-3">
-          <h2 className="text-white font-black italic text-2xl uppercase tracking-tighter">
-            Node <span className="text-blue-500">Monitor</span>
-          </h2>
+          <h2 className="text-white font-black italic text-3xl uppercase tracking-tighter">Terminal <span className="text-emerald-500">Node</span></h2>
           <div className="flex items-center gap-3">
-            <div className={`h-1.5 w-1.5 rounded-full ${status === 'scanning' ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500 shadow-[0_0_10px_#10b981]'}`} />
-            <span className="text-[8px] font-black uppercase tracking-[0.6em] text-gray-700 italic">
-              {status === 'scanning' ? 'Pulse: Active / Scanning' : 'Status: Secured'}
+            <div className={`h-2.5 w-2.5 rounded-full ${status === 'scanning' ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500 shadow-[0_0_20px_#10b981]'}`} />
+            <span className="text-[10px] font-black uppercase tracking-[0.6em] text-gray-700 italic">
+              {status === 'scanning' ? 'Pulse: Active / Scanning' : 'Status: Transaction Received'}
             </span>
           </div>
         </div>
-        <div className="text-right space-y-1">
-          <span className="text-[8px] font-black text-gray-800 uppercase tracking-widest block">Terminal_Node_01</span>
-          <span className="text-[10px] font-black text-emerald-500/40 italic">ENCRYPTED</span>
+        <div className="text-right">
+          <p className="text-emerald-500/40 text-[10px] font-black uppercase tracking-[0.4em] italic mb-1">Live Monitor v3.7</p>
+          <p className="text-white/40 font-black italic text-xl tracking-widest">{new Date().toLocaleTimeString('ka-GE', {hour: '2-digit', minute:'2-digit'})}</p>
         </div>
       </header>
 
-      {/* 💰 Main Display Area */}
-      <main className="flex-1 flex flex-col items-center justify-center">
+      <main className="flex-1 flex flex-col items-center justify-center relative">
         <AnimatePresence mode="wait">
           {status === 'scanning' ? (
             <motion.div key="ready" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center">
-              <h3 className="text-6xl md:text-8xl font-black italic text-white/[0.02] uppercase tracking-tighter select-none">
-                Standby Mode
-              </h3>
+              <h3 className="text-8xl md:text-[140px] font-black italic text-white/[0.02] uppercase tracking-tighter select-none">Monitoring...</h3>
             </motion.div>
           ) : (
-            <motion.div 
-              key="amount" 
-              initial={{ y: 30, opacity: 0, scale: 0.95 }} 
-              animate={{ y: 0, opacity: 1, scale: 1 }} 
-              exit={{ y: -30, opacity: 0, scale: 1.05 }}
-              className="text-center relative"
-            >
-              <div className="absolute inset-0 bg-emerald-500/5 blur-[160px] -z-10 rounded-full" />
-              <span className="text-emerald-500 text-[11px] font-black uppercase tracking-[1em] italic mb-8 block">Verified Settlement</span>
-              <h1 className="text-[140px] md:text-[320px] font-black italic tracking-tighter text-white leading-none">
-                <span>{lastPayment?.final_amount?.toFixed(2)}</span>
-                <span className="text-4xl md:text-7xl opacity-20 ml-6 not-italic font-sans">₾</span>
-              </h1>
-              <div className="flex items-center justify-center gap-6 mt-12">
-                <div className="h-[1px] w-12 bg-emerald-500/20" />
-                <p className="text-[10px] font-black text-gray-600 uppercase tracking-[0.4em] italic">
-                  REF: <span className="text-white opacity-60">{lastPayment?.id?.slice(0,16).toUpperCase()}</span>
-                </p>
-                <div className="h-[1px] w-12 bg-emerald-500/20" />
+            <motion.div key="amount" initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }} className="text-center w-full relative z-20">
+              
+              <div className="mb-10 flex flex-col items-center">
+                 <span className="text-white/20 text-[18px] font-black uppercase tracking-[1.5em] italic mb-4 block leading-none">CHECK BILL AMOUNT</span>
+                 <div className="px-8 py-3 bg-white/5 border border-white/10 rounded-full">
+                    <p className="text-4xl font-black text-emerald-500 italic tracking-widest">
+                       {lastPayment?.exactTime}
+                    </p>
+                 </div>
+              </div>
+
+              <div className="relative inline-block px-4">
+                <div className="absolute inset-0 bg-emerald-500/5 blur-[200px] -z-10 rounded-full" />
+                
+                {/* 🚀 ველის სახელი შევცვალე bill_amount-ით */}
+                <h1 className="text-[200px] md:text-[420px] font-black italic tracking-tighter text-white leading-none drop-shadow-[0_0_100px_rgba(255,255,255,0.1)]">
+                  {(lastPayment?.bill_amount || lastPayment?.initial_amount || 0).toFixed(2)}
+                  <span className="text-6xl md:text-9xl opacity-20 ml-8 not-italic font-sans">₾</span>
+                </h1>
+              </div>
+
+              <div className="mt-16 flex flex-col items-center gap-6">
+                <div className="px-12 py-6 bg-emerald-600/20 border-2 border-emerald-500/40 rounded-[35px] shadow-[0_0_50px_rgba(16,185,129,0.15)]">
+                  <p className="text-[22px] font-black text-emerald-500 uppercase tracking-[0.5em] italic leading-none">
+                    CUSTOMER PAID: {lastPayment?.final_amount?.toFixed(2)} ₾
+                  </p>
+                </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
-      {/* 📜 Live Pulse History */}
-      <footer className="w-full max-w-5xl mx-auto mt-12 space-y-6">
-        <div className="flex justify-between items-end border-b border-white/5 pb-4 px-2">
-          <span className="text-[10px] font-black text-gray-700 uppercase tracking-[0.6em] italic">Recent Payment Pulse</span>
-          <span className="text-[8px] font-black text-gray-800 uppercase italic italic">Live Session History</span>
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <footer className="w-full max-w-5xl mx-auto mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-48 overflow-y-auto scrollbar-hide">
           <AnimatePresence initial={false}>
-            {history.map((tx, i) => (
-              <motion.div 
-                key={tx.id} 
-                initial={{ x: -10, opacity: 0 }} 
-                animate={{ x: 0, opacity: 1 }}
-                className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 flex justify-between items-center group hover:bg-white/[0.04] transition-all"
-              >
-                <div className="flex items-center gap-5">
-                  <div className="h-10 w-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-                    <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-black text-white italic uppercase tracking-widest">Node_{tx.id.slice(0,6)}</p>
-                    <p className="text-[8px] font-black text-gray-600 uppercase italic tracking-widest">
-                      {tx.timestamp} • {tx.influencer_id ? 'Partner Token' : 'Direct Pulse'}
-                    </p>
-                  </div>
+            {history.map((tx) => (
+              <motion.div key={tx.id} initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} className="bg-white/[0.03] border border-white/5 rounded-3xl p-6 flex justify-between items-center group hover:border-emerald-500/20 transition-all">
+                <div className="flex flex-col">
+                  <span className="text-white font-black italic text-2xl tracking-widest leading-none mb-1">{tx.exactTime}</span>
+                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">REF_{tx.id.slice(0,6).toUpperCase()}</span>
                 </div>
                 <div className="text-right">
-                  <p className="text-xl font-black italic text-emerald-500 leading-none">{tx.final_amount?.toFixed(2)} ₾</p>
-                  <span className="text-[7px] font-black text-gray-800 uppercase tracking-tighter">SECURED</span>
+                  {/* 🚀 აქაც bill_amount */}
+                  <span className="text-4xl font-black italic text-white leading-none block">{(tx.bill_amount || tx.initial_amount || 0).toFixed(2)} ₾</span>
+                  <span className="text-[10px] font-black text-emerald-500/50 uppercase tracking-widest mt-2 block">PAID: {tx.final_amount.toFixed(2)} ₾</span>
                 </div>
               </motion.div>
             ))}
           </AnimatePresence>
-          {history.length === 0 && (
-            <div className="col-span-full text-center py-16 text-[10px] font-black text-gray-800 uppercase tracking-[0.5em] italic">
-              No live pulse detected
-            </div>
-          )}
         </div>
       </footer>
+
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </div>
   )
 }
