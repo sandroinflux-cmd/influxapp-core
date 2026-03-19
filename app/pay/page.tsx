@@ -9,14 +9,16 @@ import ReceiptModal from '@/components/ReceiptModal'
 
 export default function PaymentFlowPage() {
   const router = useRouter()
-  const [step, setStep] = useState('scan') // 'scan' | 'amount' | 'receipt'
+  // 🎯 განვსაზღვროთ ნაბიჯების ტიპები
+  const [step, setStep] = useState<'scan' | 'amount' | 'receipt'>('scan')
   
-  const [scannedBrand, setScannedBrand] = useState(null)
-  const [activeDeal, setActiveDeal] = useState(null)
-  const [txData, setTxData] = useState(null)
+  const [scannedBrand, setScannedBrand] = useState<string | null>(null)
+  const [activeDeal, setActiveDeal] = useState<any>(null)
+  const [txData, setTxData] = useState<{ finalPayable: number; rawAmount: number } | null>(null)
 
   // 📸 1. როცა QR კოდი დასკანერდება
-  const handleScanSuccess = async (decodedText) => {
+  // დავამატეთ ტიპი : string
+  const handleScanSuccess = async (decodedText: string) => {
     const brandId = decodedText.split('/').pop() || decodedText
     setScannedBrand(brandId)
 
@@ -27,7 +29,6 @@ export default function PaymentFlowPage() {
       const influencerId = token.profile?.id || token.id
 
       if (influencerId) {
-        // ვიღებთ პარტნიორობას და მასთან მიბმულ დილს
         const { data: partnership } = await supabase
           .from('partnerships')
           .select('*, deals(*)')
@@ -51,11 +52,15 @@ export default function PaymentFlowPage() {
       })
     }
 
-    setStep('amount')
+    // მცირე დაყოვნება, რომ QR სკანერმა მოასწროს გასუფთავება (innerText ერორის პრევენცია)
+    setTimeout(() => {
+      setStep('amount')
+    }, 150)
   }
 
   // 💸 2. როცა იუზერი თანხას ჩაწერს და იხდის
-  const handlePaymentConfirm = async (finalPayable) => {
+  // დავამატეთ ტიპი : number
+  const handlePaymentConfirm = async (finalPayable: number) => {
     // MATRIX LOGIC: ვიღებთ deal_id-ს, რომ ბაზამ დათვალოს სპლიტი
     const currentDealId = activeDeal?.deal_id || activeDeal?.id;
     
@@ -68,12 +73,11 @@ export default function PaymentFlowPage() {
     const { data, error } = await supabase
       .from('transactions')
       .insert([{
-        amount: Number(rawAmount.toFixed(2)), // საწყისი ფასი
-        deal_id: currentDealId,               // აუცილებელი პარამეტრი SQL ტრიგერისთვის
+        amount: Number(rawAmount.toFixed(2)), 
+        deal_id: currentDealId, 
         brand_id: scannedBrand,
         influencer_id: activeDeal?.influencer_id || null,
         status: 'success'
-        // დანარჩენ სვეტებს (brand_earned და ა.შ.) ავსებს ბაზა ავტომატურად
       }])
       .select()
       .single();
@@ -113,7 +117,11 @@ export default function PaymentFlowPage() {
             <h1 className="text-2xl font-black italic tracking-tighter uppercase">Initialize <span className="text-emerald-500">Node</span></h1>
             <p className="text-[10px] text-gray-500 tracking-[0.2em] uppercase">Scan physical access point</p>
           </div>
-          <QRScanner onScanSuccess={handleScanSuccess} onScanError={(err) => console.log("Scan Note:", err)} />
+          {/* @ts-ignore */}
+          <QRScanner 
+             onScanSuccess={handleScanSuccess} 
+             onScanError={(err: any) => console.log("Scan Note:", err)} 
+          />
         </div>
       )}
 
@@ -121,7 +129,10 @@ export default function PaymentFlowPage() {
         <AmountModal 
           deal={activeDeal} 
           onConfirm={handlePaymentConfirm} 
-          onCancel={() => { localStorage.removeItem('matrix_active_token'); router.push('/wallet') }} 
+          onCancel={() => { 
+            localStorage.removeItem('matrix_active_token'); 
+            router.push('/wallet') 
+          }} 
         />
       )}
 
