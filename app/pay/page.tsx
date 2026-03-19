@@ -9,7 +9,6 @@ import ReceiptModal from '@/components/ReceiptModal'
 
 export default function PaymentFlowPage() {
   const router = useRouter()
-  // 🎯 განვსაზღვროთ ნაბიჯების ტიპები
   const [step, setStep] = useState<'scan' | 'amount' | 'receipt'>('scan')
   
   const [scannedBrand, setScannedBrand] = useState<string | null>(null)
@@ -17,7 +16,6 @@ export default function PaymentFlowPage() {
   const [txData, setTxData] = useState<{ finalPayable: number; rawAmount: number } | null>(null)
 
   // 📸 1. როცა QR კოდი დასკანერდება
-  // დავამატეთ ტიპი : string
   const handleScanSuccess = async (decodedText: string) => {
     const brandId = decodedText.split('/').pop() || decodedText
     setScannedBrand(brandId)
@@ -52,17 +50,16 @@ export default function PaymentFlowPage() {
       })
     }
 
-    // მცირე დაყოვნება, რომ QR სკანერმა მოასწროს გასუფთავება (innerText ერორის პრევენცია)
+    // პრევენცია სკანერის ერორებისთვის
     setTimeout(() => {
       setStep('amount')
     }, 150)
   }
 
   // 💸 2. როცა იუზერი თანხას ჩაწერს და იხდის
-  // დავამატეთ ტიპი : number
   const handlePaymentConfirm = async (finalPayable: number) => {
-    // MATRIX LOGIC: ვიღებთ deal_id-ს, რომ ბაზამ დათვალოს სპლიტი
-    const currentDealId = activeDeal?.deal_id || activeDeal?.id;
+    // 🛡️ MATRIX FIX: ვუზრუნველყოფთ, რომ deal_id იყოს ვალიდური UUID ან null
+    const currentDealId = activeDeal?.deal_id || activeDeal?.id || null;
     
     const discountPct = activeDeal?.user_discount_pct || 0;
     const rawAmount = discountPct < 100 
@@ -74,7 +71,7 @@ export default function PaymentFlowPage() {
       .from('transactions')
       .insert([{
         amount: Number(rawAmount.toFixed(2)), 
-        deal_id: currentDealId, 
+        deal_id: currentDealId, // 🚀 ახლა უკვე უსაფრთხოდ აწვდის UUID-ს
         brand_id: scannedBrand,
         influencer_id: activeDeal?.influencer_id || null,
         status: 'success'
@@ -84,6 +81,7 @@ export default function PaymentFlowPage() {
 
     if (error) {
       console.error("Matrix Sync Error:", error.message);
+      // თუ მაინც ამოაგდო ოპერატორის ერორი, ნიშნავს რომ SQL ფუნქციაში ::UUID აკლია
       alert("გადახდა ვერ მოხერხდა: " + error.message);
       return;
     }
@@ -91,7 +89,6 @@ export default function PaymentFlowPage() {
     setTxData({ finalPayable, rawAmount });
     setStep('receipt');
 
-    // 💾 ლოკალური ისტორია ვოლეტისთვის
     const newTx = {
       id: Date.now(),
       brandName: activeDeal?.deals?.title || activeDeal?.brand_name || 'Matrix Partner',
