@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { motion, useMotionValue, useTransform, useSpring, AnimatePresence } from 'framer-motion'
+import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
 
-// 💠 შიდა კომპონენტი: GridDealCard
 function GridDealCard({ deal }: { deal: any }) {
   const [isGridCardFlipped, setIsGridCardFlipped] = useState(false)
   return (
@@ -14,7 +13,6 @@ function GridDealCard({ deal }: { deal: any }) {
       transition={{ duration: 0.6, type: "spring", stiffness: 200, damping: 20 }}
       onClick={(e) => { e.stopPropagation(); setIsGridCardFlipped(!isGridCardFlipped); }}
     >
-      {/* FRONT - დავამატეთ Webkit და translateZ */}
       <div 
         className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[45px] p-6 flex flex-col justify-between shadow-inner relative overflow-hidden group/deal" 
         style={{ 
@@ -33,7 +31,6 @@ function GridDealCard({ deal }: { deal: any }) {
         <div className="text-[7px] text-gray-700 text-center tracking-[0.4em] uppercase font-black italic">Tap to INSPECT</div>
       </div>
 
-      {/* BACK - დავამატეთ rotateY-სთან ერთად translateZ */}
       <div 
         className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[45px] p-8 flex flex-col justify-between shadow-inner" 
         style={{ 
@@ -79,7 +76,7 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
             rotateY: isFlipped ? 180 : rotateY, 
             transformStyle: "preserve-3d", 
             perspective: "2000px",
-            WebkitTransformStyle: "preserve-3d" // Safari-სთვის
+            WebkitTransformStyle: "preserve-3d"
           }} 
           animate={{ rotateY: isFlipped ? 180 : 0 }} 
           transition={{ duration: 1.1, ease: [0.19, 1, 0.22, 1] }} 
@@ -90,8 +87,8 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
             className="absolute inset-0 bg-[#040d08]/98 border-2 border-emerald-500/10 rounded-[45px] p-6 pt-10 flex flex-col items-center shadow-2xl overflow-hidden" 
             style={{ 
               backfaceVisibility: "hidden", 
-              WebkitBackfaceVisibility: "hidden", // Safari-სთვის კრიტიკულია
-              transform: "translateZ(1px)" // აიძულებს წინა ფენას წინ იყოს
+              WebkitBackfaceVisibility: "hidden",
+              transform: "translateZ(1px)"
             }}
           >
               <div className="mt-2 w-full relative flex flex-col items-center z-10">
@@ -107,6 +104,13 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
                   {profile?.full_name || deal?.brands?.name || 'SYNC NODE MASTER'}
                 </h3>
               </div>
+
+              {/* 🚀 დამატებულია: Double Tap ინსტრუქცია */}
+              <div className="absolute bottom-12 left-0 w-full flex justify-center z-20 pointer-events-none">
+                <p className="text-[10px] text-white/50 tracking-[0.4em] font-black uppercase leading-none animate-pulse">
+                  Double Tap to Flip
+                </p>
+              </div>
           </div>
 
           {/* === BACK === */}
@@ -115,7 +119,6 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
             style={{ 
               backfaceVisibility: "hidden", 
               WebkitBackfaceVisibility: "hidden",
-              // rotateY-სთან ერთად translateZ აუცილებელია Safari-სთვის
               transform: "rotateY(180deg) translateZ(1px)" 
             }}
           >
