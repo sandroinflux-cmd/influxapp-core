@@ -24,53 +24,36 @@ export default function UnifiedWallet() {
   if (loading) return <div className="min-h-screen bg-[#010201] text-emerald-500 font-black animate-pulse flex items-center justify-center uppercase tracking-widest italic">Decrypting Vault...</div>
 
   return (
-    // 🌍 p-6-დან დავიყვანეთ p-4-ზე მობილურისთვის, რომ სივიწროვე არ შეიქმნას
-    <main className="min-h-screen bg-[#010201] text-white p-4 md:p-14 overflow-x-hidden relative flex flex-col items-center">
+    <main className="min-h-screen bg-[#010201] text-white flex flex-col items-center p-4">
       
-      {/* 🔝 HEADER: დავაპატარავეთ მობილურისთვის (text-4xl და mb-10), რომ ბარათი მალე გამოჩნდეს */}
-      <header className="mb-10 md:mb-20 border-b border-white/5 pb-6 md:pb-12 font-black italic uppercase w-full max-w-7xl">
-        <h1 className="text-4xl md:text-6xl tracking-tighter">InfluX <span className="text-emerald-500 text-glow">Wallet</span></h1>
+      <header className="w-full max-w-[340px] mt-10 mb-10 border-b border-white/5 pb-6 font-black italic uppercase text-center">
+        <h1 className="text-3xl tracking-tighter">InfluX <span className="text-emerald-500 text-glow">Wallet</span></h1>
       </header>
 
-      {tokens.length === 0 ? (
-        <div className="h-64 flex items-center justify-center border border-white/5 rounded-[50px] bg-white/[0.01] w-full max-w-[320px]">
+      <div className="w-full flex flex-col items-center gap-16 pb-20">
+        {tokens.length === 0 ? (
           <p className="text-[10px] text-gray-600 font-black uppercase tracking-[0.5em] italic">No Nodes Detected</p>
-        </div>
-      ) : (
-        // 🌀 GRID: justify-items-center არის, მაგრამ mx-auto-ც დავამატეთ safe-სთვის
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-16 justify-items-center w-full max-w-7xl">
-          {tokens.map((token, idx) => (
-            // 🏷️ TOKEN WRAPPER: აი აქ არის ძაღლის თავი დამარხული.
-            // max-w-[420px] შევცვალე [320px]-ით (ქვითრის/Pass-ის ზომა).
-            // დავამატე mx-auto, რომ გრიდში იდეალურად ცენტრში დაჯდეს.
-            <div key={idx} className="w-full max-w-[320px] mx-auto flex flex-col items-center">
+        ) : (
+          tokens.map((token, idx) => (
+            // 🏷️ კონტეინერი, რომელიც განსაზღვრავს ზომას (340px - ყველა ტელეფონზე ეტევა)
+            <div key={idx} className="relative w-full max-w-[340px] mx-auto flex flex-col items-center">
               
-              {/* 🛡️ SYMMETRICAL & SHRUNKEN TOKEN WRAPPER: აი აქ არის ძაღლის თავი დამარხული.
-                  1.  scale-[0.76] md:scale-[0.88] lg:scale-100: გამოვიყენეთ responsive scale, რომ
-                      ტოკენი დაპატარავდეს დაახლოებით 1 სმ-ით (40px) 4ვე მხარეს 320px სიგანის ტელეფონის ეკრანზე.
-                  2.  origin-center + disableRotation: ვუზრუნველყოფთ სიმეტრიულობას Perfectly Centered ღილაკთან. */}
-              <div className="relative w-full aspect-[420/680] origin-center flex items-center justify-center transform scale-[0.76] md:scale-[0.88] lg:scale-100">
-                
-                {/* ⚠️ InfluXCard-ის შიგნით Transform-ები (rotate) უნდა გაითიშოს [username] გვერდიდან თუ მოდის, თორემ tilted გამოჩნდება მაინც.
-                    მე ვამატებ disableRotation პროპს, რომელიც თქვენს InfluXCard კომპონენტში უნდა გაითვალისწინოთ. */}
-                <InfluXCard profile={token.profile} liveDeals={token.liveDeals} disableRotation={true}>
-                  
-                  {/* 🚀 ღილაკი: ცენტრში, compact ზომით (-mt-8) */}
-                  <div className="-mt-8 flex justify-center w-full relative z-30 px-4">
-                    <button 
-                      onClick={(e) => handleScanToPay(e, token)}
-                      className="px-10 py-3.5 bg-emerald-600 text-white rounded-full font-black text-[10px] uppercase tracking-[0.4em] hover:bg-emerald-500 transition-all duration-300 shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] italic active:scale-95 whitespace-nowrap"
-                    >
-                      SCAN TO PAY
-                    </button>
-                  </div>
+              <InfluXCard profile={token.profile} liveDeals={token.liveDeals} disableRotation={true} />
 
-                </InfluXCard>
+              {/* 🚀 ღილაკი: იდეალურად სიმეტრიული და ცენტრში */}
+              <div className="absolute top-[85%] left-1/2 -translate-x-1/2 z-50">
+                <button 
+                  onClick={(e) => handleScanToPay(e, token)}
+                  className="px-12 py-4 bg-emerald-600 text-white rounded-full font-black text-[11px] uppercase tracking-[0.4em] shadow-[0_0_30px_rgba(16,185,129,0.5)] border border-white/10 active:scale-90 transition-all italic whitespace-nowrap"
+                >
+                  SCAN TO PAY
+                </button>
               </div>
+
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
     </main>
   )
 }
