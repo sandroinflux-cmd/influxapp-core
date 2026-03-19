@@ -57,7 +57,7 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
 
   if (!profile && !deal) return null
 
-  // ვაცალკევებთ სახელს და გვარს, რომ ზუსტად ფოტოსავით დავწეროთ
+  // ვაცალკევებთ სახელს და გვარს
   const nameParts = (profile?.full_name || deal?.brands?.name || 'SYNC NODE').split(' ');
   const firstName = nameParts[0];
   const lastName = nameParts.slice(1).join(' ');
@@ -77,12 +77,12 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
         >
           {/* === FRONT === */}
           <div 
-            className="absolute inset-0 bg-[#040d08]/98 border-2 border-emerald-950/30 rounded-[45px] p-5 pt-6 pb-6 flex flex-col shadow-2xl overflow-hidden" 
+            className="absolute inset-0 bg-[#040d08]/98 border-2 border-emerald-950/30 rounded-[45px] p-5 pt-6 flex flex-col shadow-2xl overflow-hidden" 
             style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "translateZ(1px)" }}
           >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98110,transparent_75%)] pointer-events-none" />
               
-              {/* 🖼️ AVATAR: ზუსტი კვადრატი, ფოტოს პროპორციებით */}
+              {/* 🖼️ AVATAR */}
               <div className="w-full relative flex flex-col items-center z-10">
                 {profile?.avatar_url && (
                   <motion.img 
@@ -93,29 +93,26 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
                   />
                 )}
                 
-                {/* 📝 NAME: ზუსტად ისეთივე თეთრი, დახრილი და მასიური, როგორც ფოტოზეა */}
+                {/* 📝 NAME */}
                 <h3 className="font-black italic uppercase text-white tracking-tighter leading-[0.85] text-glow text-center w-full px-2 mt-7 flex flex-col">
                   <span className="text-[34px]">{firstName}</span>
                   {lastName && <span className="text-[34px]">{lastName}</span>}
                 </h3>
               </div>
 
-              {/* 🔄 SPACE DISTRIBUTION: Double Tap და Button */}
-              <div className="flex-1 w-full flex flex-col items-center justify-around mt-100 relative z-40">
-                
-                {/* ზუსტად შუაში (justify-around-ის წყალობით) */}
+              {/* 🚀 TEXT: აბსოლუტური პოზიცია, ღილაკის ზემოთ */}
+              <div className="absolute bottom-[90px] left-0 w-full flex justify-center z-20 pointer-events-none">
                 <p className="text-[10px] text-white/50 tracking-[0.4em] font-black uppercase animate-pulse">
                   Double Tap to Flip
                 </p>
-
-                {/* Scan to pay ღილაკი ჩარჩოს შიგნით, ჩამოწეული 1 სმ-ით (mt-10) */}
-                {children && (
-                  <div className="w-full flex justify-center mt-10">
-                    {children}
-                  </div>
-                )}
-                
               </div>
+
+              {/* 🚀 BUTTON: აბსოლუტური პოზიცია, მაქსიმალურად ახლოს ქვედა კიდესთან (bottom-4 ნიშნავს 16px-ს კიდიდან) */}
+              {children && (
+                <div className="absolute bottom-5 left-0 w-full flex justify-center z-30">
+                  {children}
+                </div>
+              )}
           </div>
 
           {/* === BACK === */}
