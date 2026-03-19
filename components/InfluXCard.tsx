@@ -85,5 +85,16 @@ export default function InfluXCard({ profile, liveDeals, children }: { profile: 
       </div>
       <div className="w-full relative z-20 mt-8">{children}</div>
     </div>
+
+    // დაახლოებით ასე უნდა გამოიყურებოდეს კომპონენტის დასაწყისი:
+interface InfluXCardProps {
+  profile?: any;
+  liveDeals?: any[];
+  deal?: any; // 👈 აი ეს დაამატეთ აქ
+}
+
+export default function InfluXCard({ profile, liveDeals, deal }: InfluXCardProps) {
+  // ...
+}
   )
 }
