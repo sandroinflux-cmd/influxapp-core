@@ -27,14 +27,20 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+  const pathname = request.nextUrl.pathname
 
-  // 1. თუ არაა დალოგინებული და შედის დეშბორდზე -> გაუშვი Signup-ზე
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  // 🔓 1. გამონაკლისი: /wallet და /claim გვერდებზე ყველას ვუშვებთ უპირობოდ
+  if (pathname.startsWith('/wallet') || pathname.startsWith('/claim')) {
+    return response
+  }
+
+  // 🛡️ 2. თუ დალოგინებული არაა და შედის დეშბორდზე -> გაუშვი Signup-ზე
+  if (!user && pathname.startsWith('/dashboard')) {
     return NextResponse.redirect(new URL('/signup', request.url))
   }
 
+  // 🔄 3. თუ დალოგინებულია, გადავანაწილოთ როლების მიხედვით
   if (user) {
-    // 2. მოვქაჩოთ იუზერის როლი ბაზიდან
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -42,16 +48,14 @@ export async function middleware(request: NextRequest) {
       .single()
 
     const role = profile?.role
-    const pathname = request.nextUrl.pathname
 
-    // 3. თუ დალოგინებულია და ცდილობს /signup-ზე შესვლას -> გაუშვი შესაბამის დეშბორდზე
+    // თუ დალოგინებული პირი შედის Signup-ზე, გაუშვი მისთვის განკუთვნილ დეშბორდზე
     if (pathname === '/signup') {
       const targetPath = role === 'brand' ? '/dashboard/brand' : '/dashboard/influencer'
       return NextResponse.redirect(new URL(targetPath, request.url))
     }
 
-    // 4. როლებზე დაფუძნებული დაცვა (RBAC)
-    // ბრენდი ვერ შევა ინფლუენსერის გვერდზე და პირიქით
+    // RBAC: როლებზე დაფუძნებული წვდომა დეშბორდებზე
     if (role === 'influencer' && pathname.startsWith('/dashboard/brand')) {
       return NextResponse.redirect(new URL('/dashboard/influencer', request.url))
     }
@@ -65,5 +69,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  //Matcher-ში დავტოვოთ მხოლოდ ის გვერდები, რომლებსაც კონტროლი სჭირდება
   matcher: ['/dashboard/:path*', '/signup'],
 }

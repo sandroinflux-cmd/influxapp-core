@@ -1,127 +1,89 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
-import { useState, ReactNode } from 'react'
 
-const matrixDeals = Array.from({ length: 116 }, (_, i) => ({
-  id: i + 1,
-  brand: ['Nike', 'Tesla', 'Apple', 'Adidas', 'Hublot'][i % 5],
-  offer: ['20% OFF', '15% OFF', 'ACCESS', '10% OFF', 'VIP Access'][i % 5],
-  color: ['#10b981', '#3b82f6', '#a855f7', '#06b6d4', '#f59e0b'][i % 5],
-  glow: ['rgba(16,185,129,0.5)', 'rgba(59,130,246,0.5)', 'rgba(168,85,247,0.5)', 'rgba(6,182,212,0.5)', 'rgba(245,158,11,0.5)'][i % 5],
-  logo: ['👟', '🚗', '🍎', '👟', '⌚'][i % 5],
-}))
+// 💠 შიდა კომპონენტი: GridDealCard
+function GridDealCard({ deal }: { deal: any }) {
+  const [isGridCardFlipped, setIsGridCardFlipped] = useState(false)
+  return (
+    <motion.div 
+      className="relative cursor-pointer h-full"
+      style={{ transformStyle: 'preserve-3d', perspective: "1000px" }}
+      animate={{ rotateY: isGridCardFlipped ? 180 : 0 }}
+      transition={{ duration: 0.6, type: "spring", stiffness: 200, damping: 20 }}
+      onClick={(e) => { e.stopPropagation(); setIsGridCardFlipped(!isGridCardFlipped); }}
+    >
+      {/* FRONT */}
+      <div className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[45px] p-6 flex flex-col justify-between shadow-inner hover:border-emerald-500/20 transition-all duration-700 relative overflow-hidden group/deal" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
+        <div className="absolute inset-0 bg-emerald-500/[0.01] opacity-0 group-hover/deal:opacity-100 transition-opacity blur-xl rounded-full" />
+        <div className="flex flex-col items-center gap-2 relative z-10 text-center">
+            <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-white/[0.03] border-2 border-white/10 flex items-center justify-center mb-1 shadow-inner overflow-hidden">
+               {deal.logo?.startsWith('http') ? <img src={deal.logo} alt="brand" className="h-full w-full object-cover" /> : <span className="text-xl md:text-2xl">{deal.logo || '💎'}</span>}
+            </div>
+            <h3 className="text-[10px] md:text-[11px] text-white tracking-widest truncate w-full text-center leading-none opacity-60 mt-1 uppercase font-black italic">{deal.brand}</h3>
+        </div>
+        <h2 className="text-5xl md:text-6xl text-center py-4 text-emerald-500 text-glow leading-none relative z-10 tracking-tighter uppercase font-black italic">{deal.offer}</h2>
+        <div className="relative z-10 opacity-0 group-hover/deal:opacity-100 transition-opacity">
+           <button className="text-[7px] text-gray-700 pt-3 text-center tracking-[0.4em] leading-none uppercase font-black italic hover:text-emerald-500 transition-colors">Tap to INSPECT INTEL</button>
+        </div>
+      </div>
+      {/* BACK */}
+      <div className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[45px] p-8 flex flex-col justify-between shadow-inner" style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+        <div className="space-y-6 text-center italic font-black uppercase leading-none break-words">
+           <div className="border-b border-white/10 pb-4 mb-2"><h4 className="text-[11px] text-emerald-500 tracking-[0.5em]">AUTH NODE INTEL</h4></div>
+           <div className="space-y-3 px-2">
+             <div className="group/item"><span className="text-[8px] text-gray-600 uppercase tracking-widest block mb-1 italic">INTEL PHONE</span><p className="text-md text-white">{deal.backIntelPhone || 'CLASSIFIED'}</p></div>
+             <div className="group/item"><span className="text-[8px] text-gray-600 uppercase tracking-widest block mb-1 italic">Status</span><p className="text-md text-emerald-500">SECURED</p></div>
+           </div>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
 
-export default function InfluXCard({ deal, children }: { deal: any, children?: ReactNode }) {
+// 💠 მთავარი კომპონენტი: InfluXCard
+export default function InfluXCard({ profile, liveDeals, children }: { profile: any, liveDeals: any[], children?: React.ReactNode }) {
   const [isFlipped, setIsFlipped] = useState(false)
-  
-  // 🚀 Liquid Physics: დავამატე 'mass' და 'damping' სითხევადობისთვის
-  const x = useMotionValue(0)
-  const y = useMotionValue(0)
-  const mouseXSpring = useSpring(x, { stiffness: 150, damping: 25, mass: 0.5 })
-  const mouseYSpring = useSpring(y, { stiffness: 150, damping: 25, mass: 0.5 })
+  const x = useMotionValue(0), y = useMotionValue(0)
+  const mouseXSpring = useSpring(x, { stiffness: 60, damping: 50 }), mouseYSpring = useSpring(y, { stiffness: 60, damping: 50 })
+  const rotateX = useTransform(mouseYSpring, [-300, 300], [5, -5]), rotateY = useTransform(mouseXSpring, [-300, 300], [-5, 5])
 
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], [20, -20])
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], [-20, 20])
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    // 🖱️ კოორდინატების გამოთვლა უფრო რბილი ტრეკინგისთვის
-    x.set((e.clientX - rect.left) / rect.width - 0.5)
-    y.set((e.clientY - rect.top) / rect.height - 0.5)
-  }
-
-  const handleMouseLeave = () => {
-    x.set(0)
-    y.set(0)
-  }
+  if (!profile) return null
 
   return (
-    <div className="relative w-full max-w-[380px] mb-10" style={{ perspective: "2000px" }}>
-      <motion.div
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        onDoubleClick={() => setIsFlipped(!isFlipped)}
-        style={{ 
-            rotateX: isFlipped ? 0 : rotateX, 
-            rotateY: isFlipped ? 180 : rotateY, 
-            transformStyle: "preserve-3d" 
-        }}
-        animate={{ rotateY: isFlipped ? 180 : 0 }}
-        transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
-        className="relative h-[620px] group cursor-pointer"
-      >
-        
-        {/* === FRONT SIDE (Cyborg Influencer Identity) === */}
-        <div 
-            className="absolute inset-0 bg-[#040d08]/95 border-2 border-emerald-500/10 rounded-[45px] p-8 flex flex-col items-center shadow-[0_0_80px_rgba(0,0,0,1)] overflow-hidden"
-            style={{ backfaceVisibility: "hidden" }}
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98110,transparent_70%)] pointer-events-none" />
+    <div className="relative w-full max-w-[420px] flex flex-col items-center z-10">
+      <div className="relative w-full" onMouseMove={(e) => { const rect = e.currentTarget.getBoundingClientRect(); x.set(e.clientX - (rect.left + rect.width / 2)); y.set(e.clientY - (rect.top + rect.height / 2)) }} onMouseLeave={() => { x.set(0); y.set(0) }} onDoubleClick={() => setIsFlipped(!isFlipped)}>
+        <motion.div style={{ rotateX: isFlipped ? 0 : rotateX, rotateY: isFlipped ? 180 : rotateY, transformStyle: "preserve-3d", perspective: "2000px" }} animate={{ rotateY: isFlipped ? 180 : 0 }} transition={{ duration: 1.1, ease: [0.19, 1, 0.22, 1] }} className="w-[420px] h-[680px] relative cursor-pointer">
           
-          <div className="w-full h-[75%] rounded-[35px] bg-black/40 border border-white/5 relative overflow-hidden flex items-center justify-center backdrop-blur-3xl shadow-inner">
-              <div className="absolute top-6 w-full px-6 flex justify-center z-20">
-                <motion.div 
-                    animate={{ 
-                      color: ["#10b981", "#3b82f6", "#a855f7", "#06b6d4", "#f59e0b", "#10b981"],
-                      textShadow: ["0 0 10px #10b981", "0 0 10px #3b82f6", "0 0 10px #a855f7", "0 0 10px #06b6d4", "0 0 10px #f59e0b", "0 0 10px #10b981"]
-                    }}
-                    transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}
-                    className="text-[9px] font-black uppercase tracking-[0.5em] italic opacity-80"
-                >
-                  Double Tap to Flip
-                </motion.div>
+          {/* === FRONT === */}
+          <div className="absolute inset-0 bg-[#040d08]/98 border-2 border-emerald-500/10 rounded-[55px] p-8 pt-12 flex flex-col items-center shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden" style={{ backfaceVisibility: "hidden" }}>
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98115,transparent_75%)]" />
+              
+              <div className="mt-2 w-full relative flex flex-col items-center z-10">
+                <motion.img src={profile.avatar_url || ''} className="h-96 w-96 object-cover rounded-[40px] filter brightness-110 drop-shadow-[0_0_80px_#10b981cc]" animate={{ y: [0, -20, 0], rotateY: [0, 15, -15, 0], scale: [1, 1.03, 1] }} transition={{ repeat: Infinity, duration: 12, ease: "easeInOut" }} />
+                <h3 className="text-3xl font-black italic uppercase text-white tracking-tighter leading-none text-glow text-center w-full px-4 break-words mt-6">{profile.full_name || 'SYNC NODE MASTER'}</h3>
               </div>
 
-              <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.4, 0.1] }} transition={{ repeat: Infinity, duration: 4 }} className="absolute inset-0 bg-emerald-500 blur-3xl" />
-              
-              <motion.div animate={{ y: [0, -20, 0], rotateY: [0, 15, -15, 0] }} transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }} className="relative flex items-center justify-center pointer-events-none">
-                  <span className="text-[250px] relative z-10 filter drop-shadow-[0_0_60px_#10b98166] opacity-90 select-none brightness-150">🤖</span>
-              </motion.div>
+              {/* 🚀 ABSOLUTE POSITIONING - აქედან ვეღარ გაიქცევა! */}
+              <div className="absolute bottom-10 left-0 w-full flex justify-center z-20 pointer-events-none">
+                <p className="text-[10px] text-white/50 tracking-[0.4em] font-black uppercase leading-none animate-pulse">
+                  Double Tap to Flip
+                </p>
+              </div>
           </div>
 
-          <div className="flex-1 flex flex-col items-center justify-center w-full relative z-10 mt-4">
-              <h3 className="text-4xl font-black italic tracking-[1px] uppercase text-white leading-none">Influencer X</h3>
-              <div className="h-[1px] w-12 bg-emerald-500/40 mt-4 mb-2" />
-              <p className="text-[7px] text-emerald-500/50 font-black uppercase tracking-[0.4em] italic leading-none truncate">
-                {deal?.brands?.name || 'Authorized Node'}
-              </p>
-          </div>
-        </div>
-
-        {/* === BACK SIDE (Scrollable Deals Matrix) === */}
-        <div 
-          className="absolute inset-0 bg-[#020302] border-2 border-white/5 rounded-[45px] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden"
-          style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
-        >
-          {/* ✅ დავამატე 'overflow-y-auto' და 'scrollbar-hide' სქროლვისთვის */}
-          <div className="w-full h-full overflow-y-auto scrollbar-hide p-6 bg-[radial-gradient(circle_at_0%_0%,#ffffff03,transparent_50%)]">
-            <div className="grid grid-cols-2 gap-4 auto-rows-fr">
-              {matrixDeals.map((mDeal) => (
-                <div key={mDeal.id} className="aspect-[0.85/1] bg-white/[0.02] border border-white/5 rounded-[30px] p-5 flex flex-col justify-between group/deal relative overflow-hidden transition-all duration-700 h-full">
-                  <div className="flex flex-col items-center text-center gap-3 relative z-10">
-                      <div className="h-10 w-10 rounded-2xl bg-white/5 flex items-center justify-center text-xl border border-white/5 group-hover/deal:border-emerald-500/30 transition-all">{mDeal.logo}</div>
-                      <h3 className="text-[10px] font-black italic uppercase text-white tracking-widest leading-none truncate w-full">{mDeal.brand}</h3>
-                  </div>
-                  <div className="flex flex-col items-center justify-center flex-1 relative z-10 py-4">
-                    <h2 className="text-2xl font-black italic tracking-tighter uppercase text-center leading-none" style={{ color: mDeal.color, textShadow: `0 0 25px ${mDeal.glow}` }}>{mDeal.offer}</h2>
-                  </div>
-                  <div className="text-[6px] font-black uppercase tracking-[0.4em] text-gray-700 border-t border-white/5 pt-3 relative z-10 w-full text-center font-mono">NODE-{mDeal.id}</div>
-                </div>
-              ))}
+          {/* === BACK === */}
+          <div className="absolute inset-0 bg-[#010201] border-2 border-white/10 rounded-[55px] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden" style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
+            <div className="w-full h-full p-8 pt-10 bg-[radial-gradient(circle_at_0%_0%,#ffffff03,transparent_60%)] overflow-y-auto scrollbar-hide">
+              <div className="grid grid-cols-2 gap-4 auto-rows-fr h-full">
+                {liveDeals.length > 0 ? liveDeals.map((deal) => <GridDealCard key={deal.id} deal={deal} />) : <div className="col-span-2 py-40 text-center opacity-20 italic font-black uppercase"><p className="text-[11px] tracking-widest">No Sync Detected</p></div>}
+              </div>
             </div>
           </div>
-        </div>
-      </motion.div>
-
-      <div className="relative z-20">
-        {children}
+        </motion.div>
       </div>
-
-      <style jsx global>{`
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
+      <div className="w-full relative z-20 mt-8">{children}</div>
     </div>
   )
 }

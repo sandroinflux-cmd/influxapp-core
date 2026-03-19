@@ -69,8 +69,9 @@ const brandMenuItems = [
     )
   },
   { 
-    name: 'Payouts', 
-    path: '/dashboard/brand/billing', 
+    // ⚡️ გადაკეთდა: Payouts -> Settlements
+    name: 'Settlements', 
+    path: '/dashboard/brand/settlements', 
     color: '#ec4899', 
     icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -98,7 +99,6 @@ export default function BrandSidebar() {
   return (
     <motion.aside 
       initial={false}
-      // ⚡️ აჩქარებული ტრანზიცია
       animate={{ width: isExpanded ? 280 : 100 }}
       transition={{ duration: 0.2, ease: "circOut" }}
       onHoverStart={() => setIsExpanded(true)}

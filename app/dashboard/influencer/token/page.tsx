@@ -1,161 +1,192 @@
 'use client'
 
-import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion'
 
-const generateDeals = (count: number) => {
-  const baseDeals = [
-    { brand: 'Nike', offer: '20% OFF', color: '#10b981', glow: 'rgba(16,185,129,0.5)', logo: '👟' },
-    { brand: 'Tesla', offer: '15% OFF', color: '#3b82f6', glow: 'rgba(59,130,246,0.5)', logo: '🚗' },
-    { brand: 'Apple', offer: 'ACCESS', color: '#a855f7', glow: 'rgba(168,85,247,0.5)', logo: '🍎' },
-    { brand: 'Adidas', offer: '10% OFF', color: '#06b6d4', glow: 'rgba(6,182,212,0.5)', logo: '👟' },
-    { brand: 'Hublot', offer: 'VIP Access', color: '#f59e0b', glow: 'rgba(245,158,11,0.5)', logo: '⌚' },
-  ]
-  return Array.from({ length: count }, (_, i) => ({
-    id: i + 1,
-    ...baseDeals[i % baseDeals.length],
-  }))
+// Sub-component to render individual deal cards on the back of the token
+function GridDealCard({ deal }: { deal: any }) {
+  const [isGridCardFlipped, setIsGridCardFlipped] = useState(false)
+
+  return (
+    <motion.div 
+      className="relative cursor-pointer h-full"
+      style={{ transformStyle: 'preserve-3d', perspective: "1000px" }}
+      animate={{ rotateY: isGridCardFlipped ? 180 : 0 }}
+      transition={{ duration: 0.6, type: "spring", stiffness: 200, damping: 20 }}
+      onClick={() => setIsGridCardFlipped(!isGridCardFlipped)}
+    >
+      {/* 💠 FRONT DEAL SIDE */}
+      <div 
+        className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[45px] p-6 flex flex-col justify-between shadow-inner hover:border-emerald-500/20 transition-all duration-700 relative overflow-hidden group/deal" 
+        style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+      >
+        <div className="absolute inset-0 bg-emerald-500/[0.01] opacity-0 group-hover/deal:opacity-100 transition-opacity blur-xl rounded-full" />
+        <div className="flex flex-col items-center gap-2 relative z-10 text-center">
+            <div className="h-14 w-14 md:h-16 md:w-16 rounded-full bg-white/[0.03] border-2 border-white/10 flex items-center justify-center mb-1 shadow-inner overflow-hidden">
+               {deal.logo?.startsWith('http') 
+                  ? <img src={deal.logo} alt="brand" className="h-full w-full object-cover" /> 
+                  : <span className="text-xl md:text-2xl">{deal.logo}</span>}
+            </div>
+            <h3 className="text-[10px] md:text-[11px] text-white tracking-widest truncate w-full text-center leading-none opacity-60 mt-1 uppercase font-black italic">{deal.brand}</h3>
+        </div>
+        <h2 className="text-5xl md:text-6xl text-center py-4 text-emerald-500 text-glow leading-none relative z-10 tracking-tighter uppercase font-black italic">{deal.offer}</h2>
+        <div className="relative z-10 opacity-0 group-hover/deal:opacity-100 transition-opacity">
+           <button className="text-[7px] text-gray-700 pt-3 text-center tracking-[0.4em] leading-none uppercase font-black italic hover:text-emerald-500 transition-colors">Tap to INSPECT INTEL</button>
+        </div>
+      </div>
+
+      {/* 💠 BACK DEAL SIDE */}
+      <div 
+        className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[45px] p-8 flex flex-col justify-between shadow-inner" 
+        style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+      >
+        <div className="space-y-6 text-center italic font-black uppercase leading-none break-words">
+           <div className="border-b border-white/10 pb-4 mb-2">
+             <h4 className="text-[11px] text-emerald-500 tracking-[0.5em]">AUTH NODE INTEL</h4>
+           </div>
+           <div className="space-y-3 px-2">
+             <div className="group/item">
+                <span className="text-[8px] text-gray-600 uppercase tracking-widest block mb-1 italic">INTEL PHONE</span>
+                <p className="text-md text-white">{deal.backIntelPhone || 'CLASSIFIED'}</p>
+             </div>
+             <div className="group/item">
+                <span className="text-[8px] text-gray-600 uppercase tracking-widest block mb-1 italic">Status</span>
+                <p className="text-md text-emerald-500">SECURED</p>
+             </div>
+           </div>
+        </div>
+      </div>
+    </motion.div>
+  )
 }
-
-const matrixDeals = generateDeals(116)
 
 export default function TokenForge() {
   const [isFlipped, setIsFlipped] = useState(false)
-  
+  const [liveDeals, setLiveDeals] = useState<any[]>([])
+  const [profile, setProfile] = useState<{ id: string; full_name: string; avatar_url: string } | null>(null)
+  const [isProfileLoading, setIsProfileLoading] = useState(true)
+  const [isCopied, setIsCopied] = useState(false)
+
   const x = useMotionValue(0)
   const y = useMotionValue(0)
+  const mouseXSpring = useSpring(x, { stiffness: 60, damping: 50 })
+  const mouseYSpring = useSpring(y, { stiffness: 60, damping: 50 })
 
-  const mouseXSpring = useSpring(x, { stiffness: 300, damping: 30 })
-  const mouseYSpring = useSpring(y, { stiffness: 300, damping: 30 })
+  const rotateX = useTransform(mouseYSpring, [-300, 300], [5, -5])
+  const rotateY = useTransform(mouseXSpring, [-300, 300], [-5, 5])
 
-  const rotateX = useTransform(mouseYSpring, [-300, 300], [25, -25])
-  const rotateY = useTransform(mouseXSpring, [-300, 300], [-25, 25])
+  const fetchAllData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-  const handleMouseMove = (event: React.MouseEvent) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    const centerX = rect.left + rect.width / 2
-    const centerY = rect.top + rect.height / 2
-    x.set(event.clientX - centerX)
-    y.set(event.clientY - centerY)
+      const { data: profData } = await supabase.from('profiles').select('id, full_name, avatar_url').eq('id', user.id).single()
+      if (profData) setProfile(profData)
+      setIsProfileLoading(false)
+
+      const { data: dealsData } = await supabase.from('partnerships').select('*, deals(*)').eq('influencer_id', user.id)
+      if (dealsData) {
+        const pushedDeals = dealsData.filter((d: any) => d.is_pushed_to_token === true)
+        setLiveDeals(pushedDeals.map((d: any, i: number) => ({
+          id: d.id || i,
+          brand: d.deals?.title || 'MATRIX NODE',
+          offer: `${d.user_discount_pct || 0}% OFF`,
+          logo: d.deals?.logo || '💎',
+          backIntelPhone: d.deals?.intel?.phone || 'Secret Node'
+        })))
+      }
+    } catch (err: any) { console.error(err) }
+  }
+
+  useEffect(() => {
+    fetchAllData()
+    const channel = supabase.channel('token-forge-pulse').on('postgres_changes', { event: '*', schema: 'public', table: 'partnerships' }, () => fetchAllData()).subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
+  // ✅ ✅ ✅ ლინკის გაზიარების ლოგიკა
+  const handleDeployLink = () => {
+    if (!profile) return
+    // ლინკის ფორმატი: დომენი + ქლეიმ ფეიჯი + ინფლუენსერის ID
+    const deployUrl = `${window.location.origin}/claim?ref=${profile.id}`
+    navigator.clipboard.writeText(deployUrl)
+    setIsCopied(true)
+    setTimeout(() => setIsCopied(false), 3000)
   }
 
   return (
-    <main className="min-h-screen w-full bg-[#010201] text-white p-6 md:p-14 lg:ml-0 overflow-hidden font-sans relative flex flex-col items-center">
+    <main className="min-h-screen w-full bg-[#010201] text-white p-6 md:p-14 overflow-hidden font-sans flex flex-col items-center relative">
       
-      {/* Matrix Header */}
-      <header className="w-full mb-8 relative z-10 self-start">
-        <span className="text-emerald-500/40 text-[9px] font-black tracking-[0.8em] uppercase mb-4 block italic leading-none">Matrix Node Asset v1.0</span>
-        <h1 className="text-7xl font-black tracking-tighter uppercase italic leading-none">
-          Token <span className="text-emerald-500 text-glow">Forge</span>
-        </h1>
+      <div className="absolute inset-0 bg-black/50 bg-[linear-gradient(rgba(16,185,129,0.02)_1.5px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.02)_1.5px,transparent_1px)] bg-[size:30px_30px] opacity-30" />
+
+      <header className="w-full mb-8 flex justify-between items-start z-10">
+        <div>
+           <span className="text-emerald-500/40 text-[9px] tracking-[0.8em] mb-4 block leading-none font-black uppercase italic">Matrix Node Asset v1.0</span>
+           <h1 className="text-7xl tracking-tighter uppercase leading-none font-black italic">Token</h1>
+        </div>
+        
+        {/* ✅ ✅ ✅ Deployment Button (NEW) */}
+        <button 
+          onClick={handleDeployLink}
+          className={`mt-4 px-10 py-4 rounded-full border-2 transition-all duration-500 font-black text-[10px] uppercase tracking-[0.3em] italic ${isCopied ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10' : 'border-white/10 hover:border-emerald-500/40 bg-white/5'}`}
+        >
+          {isCopied ? 'Transmission Sent ✓' : 'Deploy Asset Link +'}
+        </button>
       </header>
 
-      {/* Interactive Asset Controller */}
       <div 
-        className="flex-1 flex flex-col items-center justify-center relative z-10 cursor-none pb-20 w-full"
-        onMouseMove={handleMouseMove}
+        className="flex-1 flex flex-col items-center justify-center w-full relative z-10 mt-[-40px]"
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          x.set(e.clientX - (rect.left + rect.width / 2))
+          y.set(e.clientY - (rect.top + rect.height / 2))
+        }}
         onMouseLeave={() => { x.set(0); y.set(0) }}
         onDoubleClick={() => setIsFlipped(!isFlipped)}
       >
         <motion.div
-          style={{ 
-            rotateX: isFlipped ? 0 : rotateX, 
-            rotateY: isFlipped ? 180 : rotateY, 
-            transformStyle: "preserve-3d",
-            perspective: "2000px"
-          }}
+          style={{ rotateX: isFlipped ? 0 : rotateX, rotateY: isFlipped ? 180 : rotateY, transformStyle: "preserve-3d", perspective: "2000px" }}
           animate={{ rotateY: isFlipped ? 180 : 0 }}
-          transition={{ duration: 0.9, ease: [0.19, 1, 0.22, 1] }}
-          className="w-[380px] h-[620px] relative"
+          transition={{ duration: 1.1, ease: [0.19, 1, 0.22, 1] }}
+          className="w-[420px] h-[680px] relative cursor-pointer"
         >
-          
-          {/* === FRONT SIDE (Influencer X Identity) === */}
-          <div 
-            className="absolute inset-0 bg-[#040d08]/95 border-2 border-emerald-500/10 rounded-[45px] p-8 flex flex-col items-center shadow-[0_0_80px_rgba(0,0,0,1)] overflow-hidden"
-            style={{ backfaceVisibility: "hidden" }}
-          >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98110,transparent_70%)]" />
-            
-            <div className="w-full h-[75%] rounded-[35px] bg-black/40 border border-white/5 relative overflow-hidden group shadow-inner flex items-center justify-center backdrop-blur-3xl">
-                <div className="absolute top-6 w-full px-6 flex justify-center z-20">
-                  <motion.div 
-                      animate={{ 
-                        color: ["#10b981", "#3b82f6", "#a855f7", "#06b6d4", "#f59e0b", "#10b981"],
-                        textShadow: ["0 0 10px #10b981", "0 0 10px #3b82f6", "0 0 10px #a855f7", "0 0 10px #06b6d4", "0 0 10px #f59e0b", "0 0 10px #10b981"]
-                      }}
-                      transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}
-                      className="text-[9px] font-black uppercase tracking-[0.5em] italic opacity-80"
-                  >
-                    Double Tap to Flip
-                  </motion.div>
-                </div>
-
-                <motion.div 
-                    animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.4, 0.1] }}
-                    transition={{ repeat: Infinity, duration: 4 }}
-                    className="absolute inset-0 bg-emerald-500 blur-3xl"
-                />
-                
-                <motion.div 
-                    animate={{ y: [0, -20, 0], rotateY: [0, 15, -15, 0] }}
-                    transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-                    className="relative flex items-center justify-center pointer-events-none"
-                >
-                    <span className="text-[250px] relative z-10 filter drop-shadow-[0_0_60px_#10b98166] opacity-90 select-none brightness-150">🤖</span>
-                    <div className="absolute inset-0 border-2 border-emerald-500/20 rounded-full scale-150 blur-xl animate-pulse" />
-                    <motion.div 
-                      animate={{ opacity: [0, 1, 0] }}
-                      transition={{ repeat: Infinity, duration: 0.1, delay: 2 }}
-                      className="absolute top-[35%] right-[28%] h-2 w-2 bg-emerald-400 rounded-full shadow-[0_0_15px_#34d399]"
-                    />
-                </motion.div>
-            </div>
-
-            <div className="flex-1 flex flex-col items-center justify-center w-full relative z-10">
-                <h3 className="text-4xl font-black italic tracking-[1px] uppercase text-white leading-none mt-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
-                  Influencer X
+          {/* === FRONT === */}
+          <div className="absolute inset-0 bg-[#040d08]/98 border-2 border-emerald-500/10 rounded-[55px] p-8 pt-12 pb-14 flex flex-col items-center justify-between shadow-[0_0_100px_rgba(0,0,0,0.8)] overflow-hidden" style={{ backfaceVisibility: "hidden" }}>
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98115,transparent_75%)]" />
+              
+              <div className="mt-2 flex-1 w-full relative flex flex-col items-center justify-start">
+                {isProfileLoading ? (
+                  <div className="animate-pulse h-96 w-96 bg-emerald-500/10 rounded-[40px]" />
+                ) : (
+                  <motion.img 
+                    src={profile?.avatar_url || ''} 
+                    className="h-96 w-96 object-cover rounded-[40px] filter brightness-110 drop-shadow-[0_0_80px_#10b981cc]"
+                    animate={{ y: [0, -20, 0], rotateY: [0, 15, -15, 0], scale: [1, 1.03, 1] }}
+                    transition={{ repeat: Infinity, duration: 12, ease: "easeInOut" }}
+                  />
+                )}
+                <h3 className="text-3xl font-black italic uppercase text-white tracking-tighter leading-none text-glow text-center w-full px-4 break-words mt-4">
+                  {profile?.full_name || 'SYNC NODE MASTER'}
                 </h3>
-                <div className="h-[1px] w-12 bg-emerald-500/40 mt-4" />
-            </div>
+              </div>
+
+              <div className="w-full flex justify-center pb-2">
+                <p className="text-[10px] opacity-30 tracking-[0.4em] font-black uppercase leading-none animate-pulse">Double Tap to Flip</p>
+              </div>
           </div>
 
-          {/* === BACK SIDE (Synchronized Matrix Deals) === */}
-          <div 
-            className="absolute inset-0 bg-[#020302] border-2 border-white/5 rounded-[45px] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden"
-            style={{ 
-              backfaceVisibility: "hidden", 
-              transform: "rotateY(180deg)" 
-            }}
-          >
-            <div className="w-full h-full overflow-y-auto scrollbar-hide p-6 bg-[radial-gradient(circle_at_0%_0%,#ffffff03,transparent_50%)]">
-              <div className="grid grid-cols-2 gap-4 auto-rows-fr">
-                {matrixDeals.map((deal) => (
-                  <motion.div 
-                    key={deal.id}
-                    initial={{ opacity: 0 }}
-                    whileInView={{ opacity: 1 }}
-                    className="aspect-[0.85/1] bg-white/[0.02] border border-white/5 rounded-[30px] p-6 flex flex-col justify-between group relative overflow-hidden transition-all duration-700 h-full"
-                  >
-                    <div className="flex flex-col items-center text-center gap-3 relative z-10">
-                        <div className="h-10 w-10 rounded-2xl bg-white/5 flex items-center justify-center text-xl border border-white/5 group-hover:border-emerald-500/30 transition-all">
-                          {deal.logo}
-                        </div>
-                        <h3 className="text-[10px] font-black italic uppercase text-white tracking-widest leading-none truncate w-full">{deal.brand}</h3>
-                    </div>
-                    
-                    <div className="flex flex-col items-center justify-center flex-1 relative z-10 py-4">
-                      <h2 className="text-3xl font-black italic tracking-tighter uppercase text-center leading-none"
-                        style={{ color: deal.color, textShadow: `0 0 25px ${deal.glow}` }}
-                      >
-                        {deal.offer}
-                      </h2>
-                    </div>
-
-                    <div className="text-[6px] font-black uppercase tracking-[0.4em] text-gray-700 border-t border-white/5 pt-3 relative z-10 w-full text-center">
-                        Auth Node
-                    </div>
-                  </motion.div>
-                ))}
+          {/* === BACK === */}
+          <div className="absolute inset-0 bg-[#010201] border-2 border-white/10 rounded-[55px] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden" style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
+            <div className="w-full h-full p-8 pt-10 bg-[radial-gradient(circle_at_0%_0%,#ffffff03,transparent_60%)]">
+              <div className="grid grid-cols-2 grid-rows-2 gap-5 h-full">
+                {liveDeals.length > 0 ? liveDeals.map((deal) => (
+                    <GridDealCard key={deal.id} deal={deal} />
+                )) : (
+                  <div className="col-span-2 py-40 text-center opacity-20 italic font-black uppercase">
+                    <p className="text-[11px] tracking-widest">No Sync Detected</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
