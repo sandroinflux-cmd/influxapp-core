@@ -1,146 +1,172 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import QRScanner from '@/components/QRScanner' 
-import AmountModal from '@/components/AmountModal'
-import ReceiptModal from '@/components/ReceiptModal'
 
-export default function PaymentFlowPage() {
-  const router = useRouter()
-  const [step, setStep] = useState<'scan' | 'amount' | 'receipt'>('scan')
+function MonitorContent() {
+  const searchParams = useSearchParams()
+  const brandId = searchParams.get('brand')
   
-  const [scannedBrand, setScannedBrand] = useState<string | null>(null)
-  const [activeDeal, setActiveDeal] = useState<any>(null)
-  const [txData, setTxData] = useState<{ finalPayable: number; rawAmount: number } | null>(null)
+  const [isActive, setIsActive] = useState(false)
+  const [lastPayment, setLastPayment] = useState<any>(null)
+  const [history, setHistory] = useState<any[]>([])
+  const [status, setStatus] = useState<'scanning' | 'success'>('scanning')
 
-  // 📸 1. როცა QR კოდი დასკანერდება
-  const handleScanSuccess = async (decodedText: string) => {
-    const brandId = decodedText.split('/').pop() || decodedText
-    setScannedBrand(brandId)
-
-    const activeTokenRaw = localStorage.getItem('matrix_active_token')
-    
-    if (activeTokenRaw) {
-      const token = JSON.parse(activeTokenRaw)
-      const influencerId = token.profile?.id || token.id
-
-      if (influencerId) {
-        const { data: partnership } = await supabase
-          .from('partnerships')
-          .select('*, deals(*)')
-          .eq('influencer_id', influencerId)
-          .eq('brand_id', brandId)
-          .single()
-
-        if (partnership) {
-          setActiveDeal(partnership)
-        } else {
-          setActiveDeal({ user_discount_pct: 0, influencer_id: influencerId, brand_id: brandId })
-        }
-      } else {
-        setActiveDeal(token)
+  const playPulseTick = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const playSharpTick = (freq: number, start: number, volume: number) => {
+        const osc = audioCtx.createOscillator()
+        const gain = audioCtx.createGain()
+        osc.type = 'square'
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + start)
+        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + start + 0.1)
+        gain.gain.setValueAtTime(volume, audioCtx.currentTime + start)
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + start + 0.1)
+        osc.connect(gain)
+        gain.connect(audioCtx.destination)
+        osc.start(audioCtx.currentTime + start)
+        osc.stop(audioCtx.currentTime + start + 0.1)
       }
-    } else {
-      setActiveDeal({
-        user_discount_pct: 0,
-        influencer_cut_pct: 0,
-        brand_id: brandId
-      })
-    }
-
-    setTimeout(() => {
-      setStep('amount')
-    }, 150)
+      playSharpTick(2500, 0, 0.5)
+      playSharpTick(3200, 0.06, 0.4)
+    } catch (e) { console.error(e) }
   }
 
-  // 💸 2. როცა იუზერი თანხას ჩაწერს და იხდის
-  const handlePaymentConfirm = async (finalPayable: number) => {
-    const currentDealId = activeDeal?.deal_id || activeDeal?.id || null;
-    const discountPct = activeDeal?.user_discount_pct || 0;
-    
-    // 🧮 გამოთვლა: ვიგებთ საწყის თანხას (რაც მომხმარებელმა შეიყვანა)
-    const rawAmount = discountPct < 100 
-      ? (finalPayable / (1 - (discountPct / 100))) 
-      : finalPayable;
+  useEffect(() => {
+    if (!isActive || !brandId) return
 
-    // 💾 შენახვა Supabase-ში ახალი ველის (bill_amount) ჩათვლით
-    const { data, error } = await supabase
-      .from('transactions')
-      .insert([{
-        amount: Number(rawAmount.toFixed(2)),       // საწყისი (თავსებადობისთვის)
-        bill_amount: Number(rawAmount.toFixed(2)),  // 🚀 ექსკლუზიურად მოლარის მონიტორისთვის!
-        final_amount: Number(finalPayable.toFixed(2)), // რეალურად გადახდილი
-        deal_id: currentDealId,
-        brand_id: scannedBrand,
-        influencer_id: activeDeal?.influencer_id || null,
-        status: 'success'
-      }])
-      .select()
-      .single();
+    const channel = supabase
+      .channel(`terminal-${brandId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'transactions', filter: `brand_id=eq.${brandId}` },
+        (payload) => {
+          const now = new Date();
+          const txData = {
+            ...payload.new,
+            exactTime: now.toLocaleTimeString('ka-GE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          }
+          
+          playPulseTick()
+          setLastPayment(txData)
+          setHistory(prev => [txData, ...prev].slice(0, 10))
+          setStatus('success')
 
-    if (error) {
-      console.error("Matrix Sync Error:", error.message);
-      alert("გადახდა ვერ მოხერხდა: " + error.message);
-      return;
-    }
+          // 🚀 ტრანზაქცია ეკრანზე რჩება 120 წამი (2 წუთი)
+          setTimeout(() => { setStatus('scanning') }, 120000)
+        }
+      )
+      .subscribe()
 
-    setTxData({ finalPayable, rawAmount });
-    setStep('receipt');
+    return () => { supabase.removeChannel(channel) }
+  }, [isActive, brandId])
 
-    // ლოკალური ისტორიის განახლება
-    const newTx = {
-      id: data.id,
-      brandName: activeDeal?.deals?.title || activeDeal?.brand_name || 'Matrix Partner',
-      paid: finalPayable,
-      saved: Number((rawAmount - finalPayable).toFixed(2)),
-      date: new Date().toISOString()
-    };
-    
-    const savedHistory = JSON.parse(localStorage.getItem('matrix_tx_history') || '[]');
-    localStorage.setItem('matrix_tx_history', JSON.stringify([newTx, ...savedHistory]));
-  }
+  if (!brandId) return <div className="min-h-screen bg-black" />
 
-  const handleDone = () => {
-    localStorage.removeItem('matrix_active_token')
-    router.push('/wallet')
+  if (!isActive) {
+    return (
+      <div className="min-h-screen bg-[#010201] flex items-center justify-center">
+        <button onClick={() => setIsActive(true)} className="bg-emerald-600 text-white px-24 py-10 rounded-[45px] font-black text-xl uppercase tracking-[0.5em] italic shadow-[0_0_60px_rgba(16,185,129,0.3)] border-2 border-white/10">
+          Initialize Terminal
+        </button>
+      </div>
+    )
   }
 
   return (
-    <main className="min-h-screen bg-[#010201] text-white flex flex-col items-center justify-center p-6 font-sans">
-      {step === 'scan' && (
-        <div className="w-full max-w-md space-y-8 animate-in fade-in zoom-in duration-500">
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl font-black italic tracking-tighter uppercase">Initialize <span className="text-emerald-500">Node</span></h1>
-            <p className="text-[10px] text-gray-500 tracking-[0.2em] uppercase">Scan physical access point</p>
+    <div className={`min-h-screen transition-colors duration-1000 flex flex-col p-8 md:p-16 ${status === 'success' ? 'bg-[#030a06]' : 'bg-[#010201]'}`}>
+      
+      <header className="flex justify-between items-start w-full max-w-7xl mx-auto z-10">
+        <div className="space-y-3">
+          <h2 className="text-white font-black italic text-3xl uppercase tracking-tighter">Terminal <span className="text-emerald-500">Node</span></h2>
+          <div className="flex items-center gap-3">
+            <div className={`h-2.5 w-2.5 rounded-full ${status === 'scanning' ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500 shadow-[0_0_20px_#10b981]'}`} />
+            <span className="text-[10px] font-black uppercase tracking-[0.6em] text-gray-700 italic">
+              {status === 'scanning' ? 'Pulse: Active / Monitoring' : 'Status: Transmission Locked'}
+            </span>
           </div>
-          <QRScanner 
-             onScanSuccess={handleScanSuccess} 
-             onScanError={(err: any) => console.log("Scan Note:", err)} 
-          />
         </div>
-      )}
+        <div className="text-right">
+          <p className="text-emerald-500/40 text-[10px] font-black uppercase tracking-[0.4em] italic mb-1">Live Monitor v3.9</p>
+          <p className="text-white/40 font-black italic text-xl tracking-widest">{new Date().toLocaleTimeString('ka-GE', {hour: '2-digit', minute:'2-digit'})}</p>
+        </div>
+      </header>
 
-      {step === 'amount' && (
-        <AmountModal 
-          deal={activeDeal} 
-          onConfirm={handlePaymentConfirm} 
-          onCancel={() => { 
-            localStorage.removeItem('matrix_active_token'); 
-            router.push('/wallet') 
-          }} 
-        />
-      )}
+      <main className="flex-1 flex flex-col items-center justify-center relative">
+        <AnimatePresence mode="wait">
+          {status === 'scanning' ? (
+            <motion.div key="ready" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center">
+              <h3 className="text-8xl md:text-[120px] font-black italic text-white/[0.02] uppercase tracking-tighter select-none">Standby</h3>
+            </motion.div>
+          ) : (
+            <motion.div key="amount" initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }} className="text-center w-full relative z-20">
+              
+              <div className="mb-8 flex flex-col items-center">
+                 <span className="text-white/20 text-[18px] font-black uppercase tracking-[1.5em] italic mb-4 block leading-none">VERIFY BILL AMOUNT</span>
+                 <div className="px-8 py-3 bg-white/5 border border-white/10 rounded-full">
+                    <p className="text-4xl font-black text-emerald-500 italic tracking-widest">
+                       {lastPayment?.exactTime}
+                    </p>
+                 </div>
+              </div>
 
-      {step === 'receipt' && (
-        <ReceiptModal 
-          total={txData?.finalPayable} 
-          originalAmount={txData?.rawAmount} 
-          deal={activeDeal} 
-          onDone={handleDone} 
-        />
-      )}
-    </main>
+              <div className="relative inline-block px-4">
+                <div className="absolute inset-0 bg-emerald-500/5 blur-[200px] -z-10 rounded-full" />
+                
+                {/* 🚀 ახალი ზომა: 270px (10%-ით პატარა იდეალური მორგებისთვის) */}
+                <h1 className="text-[160px] md:text-[270px] font-black italic tracking-tighter text-white leading-none drop-shadow-[0_0_100px_rgba(255,255,255,0.1)]">
+                  {(lastPayment?.bill_amount || lastPayment?.initial_amount || 0).toFixed(2)}
+                  <span className="text-5xl md:text-8xl opacity-20 ml-6 not-italic font-sans">₾</span>
+                </h1>
+              </div>
+
+              <div className="mt-12 flex flex-col items-center gap-6">
+                <div className="px-12 py-5 bg-emerald-600/20 border-2 border-emerald-500/40 rounded-[35px] shadow-[0_0_50px_rgba(16,185,129,0.1)]">
+                  <p className="text-[20px] font-black text-emerald-500 uppercase tracking-[0.5em] italic leading-none">
+                    PAID: {lastPayment?.final_amount?.toFixed(2)} ₾
+                  </p>
+                </div>
+                <p className="text-[9px] font-black text-gray-700 uppercase tracking-[0.8em] italic animate-pulse">Displayed for 120 seconds</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+
+      <footer className="w-full max-w-5xl mx-auto mt-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-48 overflow-y-auto scrollbar-hide">
+          <AnimatePresence initial={false}>
+            {history.map((tx) => (
+              <motion.div key={tx.id} initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} className="bg-white/[0.03] border border-white/5 rounded-3xl p-6 flex justify-between items-center group hover:border-emerald-500/20 transition-all">
+                <div className="flex flex-col">
+                  <span className="text-white font-black italic text-xl tracking-widest leading-none mb-1">{tx.exactTime}</span>
+                  <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">REF_{tx.id.slice(0,6).toUpperCase()}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-3xl font-black italic text-white leading-none block">{(tx.bill_amount || tx.initial_amount || 0).toFixed(2)} ₾</span>
+                  <span className="text-[10px] font-black text-emerald-500/50 uppercase tracking-widest mt-2 block">PAID: {tx.final_amount.toFixed(2)} ₾</span>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      </footer>
+
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+    </div>
+  )
+}
+
+export default function CashierMonitor() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black" />}>
+      <MonitorContent />
+    </Suspense>
   )
 }
