@@ -32,24 +32,27 @@ export default function UnifiedWallet() {
 
       <div className="w-full flex flex-col items-center gap-16 pb-20">
         {tokens.length === 0 ? (
-          <p className="text-[10px] text-gray-600 font-black uppercase tracking-[0.5em] italic">No Nodes Detected</p>
+          <div className="h-64 flex items-center justify-center border border-white/5 rounded-[50px] bg-white/[0.01] w-full max-w-[320px]">
+            <p className="text-[10px] text-gray-600 font-black uppercase tracking-[0.5em] italic">No Nodes Detected</p>
+          </div>
         ) : (
           tokens.map((token, idx) => (
-            // 🏷️ კონტეინერი, რომელიც განსაზღვრავს ზომას (340px - ყველა ტელეფონზე ეტევა)
+            // 🏷️ მობილურისთვის იდეალური 340px ზომა
             <div key={idx} className="relative w-full max-w-[340px] mx-auto flex flex-col items-center">
               
-              <InfluXCard profile={token.profile} liveDeals={token.liveDeals} disableRotation={true} />
-
-              {/* 🚀 ღილაკი: იდეალურად სიმეტრიული და ცენტრში */}
-              <div className="absolute top-[85%] left-1/2 -translate-x-1/2 z-50">
+              {/* ⚠️ disableRotation={true} იცავს ბარათს ვოლეტში არასასურველი მოღუნვისგან */}
+              <InfluXCard profile={token.profile} liveDeals={token.liveDeals} disableRotation={true}>
+                
+                {/* 🚀 Scan to Pay ღილაკს ვაწვდით პირდაპირ. 
+                    InfluXCard ახლა მას ავტომატურად ჩასვამს თავის "absolute bottom-5" კონტეინერში ბოლოში! */}
                 <button 
                   onClick={(e) => handleScanToPay(e, token)}
-                  className="px-12 py-4 bg-emerald-600 text-white rounded-full font-black text-[11px] uppercase tracking-[0.4em] shadow-[0_0_30px_rgba(16,185,129,0.5)] border border-white/10 active:scale-90 transition-all italic whitespace-nowrap"
+                  className="px-10 py-3.5 bg-emerald-600 text-white rounded-full font-black text-[11px] uppercase tracking-[0.4em] shadow-[0_0_30px_rgba(16,185,129,0.5)] hover:bg-emerald-500 border border-white/10 active:scale-90 transition-all italic whitespace-nowrap"
                 >
                   SCAN TO PAY
                 </button>
-              </div>
 
+              </InfluXCard>
             </div>
           ))
         )}
