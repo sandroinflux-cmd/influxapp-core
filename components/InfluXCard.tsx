@@ -44,20 +44,26 @@ function GridDealCard({ deal }: { deal: any }) {
 
 // 💠 ტიპების აღწერა (Interfaces)
 interface InfluXCardProps {
-  profile: any;
-  liveDeals: any[];
-  deal?: any; // 👈 აი ეს დავამატეთ, რომ [username] გვერდზე ერორი აღარ ამოაგდოს
+  profile?: any;      // 👈 ? ნიშნავს, რომ არასავალდებულოა
+  liveDeals?: any[];  // 👈 ?
+  deal?: any;         // 👈 ?
   children?: React.ReactNode;
 }
 
 // 💠 მთავარი კომპონენტი: InfluXCard
-export default function InfluXCard({ profile, liveDeals, deal, children }: InfluXCardProps) {
+export default function InfluXCard({ 
+  profile = null, 
+  liveDeals = [], 
+  deal, 
+  children 
+}: InfluXCardProps) {
   const [isFlipped, setIsFlipped] = useState(false)
   const x = useMotionValue(0), y = useMotionValue(0)
   const mouseXSpring = useSpring(x, { stiffness: 60, damping: 50 }), mouseYSpring = useSpring(y, { stiffness: 60, damping: 50 })
   const rotateX = useTransform(mouseYSpring, [-300, 300], [5, -5]), rotateY = useTransform(mouseXSpring, [-300, 300], [-5, 5])
 
-  if (!profile) return null
+  // თუ პროფილი არ არის, კომპონენტი არაფერს არ დაარენდერებს, ერორის ნაცვლად
+  if (!profile && !deal) return null
 
   return (
     <div className="relative w-full max-w-[420px] flex flex-col items-center z-10">
@@ -69,8 +75,17 @@ export default function InfluXCard({ profile, liveDeals, deal, children }: Influ
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98115,transparent_75%)]" />
               
               <div className="mt-2 w-full relative flex flex-col items-center z-10">
-                <motion.img src={profile.avatar_url || ''} className="h-96 w-96 object-cover rounded-[40px] filter brightness-110 drop-shadow-[0_0_80px_#10b981cc]" animate={{ y: [0, -20, 0], rotateY: [0, 15, -15, 0], scale: [1, 1.03, 1] }} transition={{ repeat: Infinity, duration: 12, ease: "easeInOut" }} />
-                <h3 className="text-3xl font-black italic uppercase text-white tracking-tighter leading-none text-glow text-center w-full px-4 break-words mt-6">{profile.full_name || 'SYNC NODE MASTER'}</h3>
+                {profile?.avatar_url && (
+                  <motion.img 
+                    src={profile.avatar_url} 
+                    className="h-96 w-96 object-cover rounded-[40px] filter brightness-110 drop-shadow-[0_0_80px_#10b981cc]" 
+                    animate={{ y: [0, -20, 0], rotateY: [0, 15, -15, 0], scale: [1, 1.03, 1] }} 
+                    transition={{ repeat: Infinity, duration: 12, ease: "easeInOut" }} 
+                  />
+                )}
+                <h3 className="text-3xl font-black italic uppercase text-white tracking-tighter leading-none text-glow text-center w-full px-4 break-words mt-6">
+                  {profile?.full_name || deal?.brands?.name || 'SYNC NODE MASTER'}
+                </h3>
               </div>
 
               <div className="absolute bottom-10 left-0 w-full flex justify-center z-20 pointer-events-none">
@@ -84,7 +99,13 @@ export default function InfluXCard({ profile, liveDeals, deal, children }: Influ
           <div className="absolute inset-0 bg-[#010201] border-2 border-white/10 rounded-[55px] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden" style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
             <div className="w-full h-full p-8 pt-10 bg-[radial-gradient(circle_at_0%_0%,#ffffff03,transparent_60%)] overflow-y-auto scrollbar-hide">
               <div className="grid grid-cols-2 gap-4 auto-rows-fr h-full">
-                {liveDeals.length > 0 ? liveDeals.map((deal) => <GridDealCard key={deal.id} deal={deal} />) : <div className="col-span-2 py-40 text-center opacity-20 italic font-black uppercase"><p className="text-[11px] tracking-widest">No Sync Detected</p></div>}
+                {liveDeals && liveDeals.length > 0 ? (
+                  liveDeals.map((d) => <GridDealCard key={d.id} deal={d} />)
+                ) : (
+                  <div className="col-span-2 py-40 text-center opacity-20 italic font-black uppercase">
+                    <p className="text-[11px] tracking-widest">No Sync Detected</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
