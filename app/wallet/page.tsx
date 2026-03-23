@@ -34,7 +34,7 @@ export default function UnifiedWallet() {
 
       <div className="w-full flex flex-col items-center gap-16 pb-20">
         {tokens.length === 0 ? (
-          // 📭 Empty State: Aggressive & Provocative
+          // 📭 Empty State: Aggressive & Provocative (No Button)
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -49,17 +49,9 @@ export default function UnifiedWallet() {
             <p className="text-[14px] md:text-base text-white font-bold uppercase tracking-[0.15em] italic leading-relaxed">
               ZERO TOKENS FOUND. Either you&apos;re lagging behind, or your &quot;favorite&quot; creator hasn&apos;t created yet.
             </p>
-            
-            {/* 🔴 RED GLOW CTA BUTTON */}
-            <button 
-              onClick={() => router.push('/')}
-              className="mt-6 px-10 py-3 bg-transparent text-gray-500 rounded-full font-black text-[10px] uppercase tracking-[0.5em] italic border-2 border-gray-800 hover:border-red-600 hover:text-red-600 transition-all active:scale-95 text-glow-red"
-            >
-              DEMAND VALUE
-            </button>
           </motion.div>
         ) : (
-          // 💳 Populated State: როცა ტოკენები არის (უნაცვლელი)
+          // 💳 Populated State: როცა ტოკენები არის
           tokens.map((token, idx) => (
             <div key={idx} className="relative w-full max-w-[340px] mx-auto flex flex-col items-center group">
               <InfluXCard profile={token.profile} liveDeals={token.liveDeals} disableRotation={true}>

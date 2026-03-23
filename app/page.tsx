@@ -10,20 +10,20 @@ const LanguageCube = ({ lang, setLang }: { lang: 'ka' | 'en', setLang: any }) =>
   return (
     <div 
       className="relative h-10 w-10 cursor-pointer pointer-events-auto select-none"
-      onClick={() => setLang(lang === 'ka' ? 'en' : 'ka')}
+      onClick={() => setLang(lang === 'en' ? 'ka' : 'en')}
       style={{ perspective: '1000px' }}
     >
       <motion.div
-        animate={{ rotateX: lang === 'ka' ? 0 : -90 }}
+        animate={{ rotateX: lang === 'en' ? 0 : -90 }} // ანიმაცია მორგებულია ახალ ლოგიკაზე
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
         className="w-full h-full relative"
         style={{ transformStyle: 'preserve-3d' }}
       >
-        <div className="absolute inset-0 bg-white text-black flex items-center justify-center rounded-sm backface-hidden font-black text-[10px]">GE</div>
+        <div className="absolute inset-0 bg-emerald-500 text-black flex items-center justify-center rounded-sm backface-hidden font-black text-[10px]">EN</div>
         <div 
-          className="absolute inset-0 bg-emerald-500 text-black flex items-center justify-center rounded-sm backface-hidden font-black text-[10px]"
+          className="absolute inset-0 bg-white text-black flex items-center justify-center rounded-sm backface-hidden font-black text-[10px]"
           style={{ transform: 'rotateX(90deg) translateZ(20px)' }}
-        >EN</div>
+        >GE</div>
       </motion.div>
     </div>
   )
@@ -83,7 +83,7 @@ const translations = {
 }
 
 export default function NeuralInterface() {
-  const [lang, setLang] = useState<'ka' | 'en'>('ka')
+  const [lang, setLang] = useState<'ka' | 'en'>('en') // 👈 შეცვლილია: default 'en'
   const [expanded, setExpanded] = useState<string | null>(null)
   const t = translations[lang]
   const router = useRouter()
