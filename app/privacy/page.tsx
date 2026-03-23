@@ -131,7 +131,7 @@ export default function TermsOfUse() {
           onClick={() => router.push('/')}
           className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 hover:text-white transition-colors"
         >
-          [ Return to Core ]
+          [ Return Back ]
         </button>
       </nav>
 
@@ -171,7 +171,7 @@ export default function TermsOfUse() {
 
       {/* 🛡️ Footer */}
       <footer className="py-12 border-t border-white/5 text-center text-gray-600 text-[10px] uppercase tracking-[0.5em] font-black">
-        END OF PROTOCOL // INFLUX NODE SECURED
+        END OF PROTOCOL // INFLUX 2026
       </footer>
 
     </main>
