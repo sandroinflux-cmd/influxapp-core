@@ -66,7 +66,7 @@ function ClaimContent() {
             onClick={handleSync} 
             className="px-12 py-3.5 bg-white text-black rounded-full font-black text-[11px] uppercase tracking-[0.4em] hover:bg-emerald-500 hover:text-white transition-all duration-500 shadow-[0_0_30px_rgba(255,255,255,0.1)] italic active:scale-95 whitespace-nowrap"
           >
-            GET ASSET
+            GET IT
           </button>
           
         </InfluXCard>
