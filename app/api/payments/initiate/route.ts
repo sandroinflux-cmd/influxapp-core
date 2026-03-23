@@ -6,8 +6,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { 
-      amount,            // 100.00 (bill_amount)
-      finalAmount,       // 85.00  (final_amount)
+      amount, 
+      finalAmount, 
       brandId, 
       influencerId, 
       dealId,
@@ -24,27 +24,27 @@ export async function POST(request: Request) {
       { cookies: { getAll() { return cookieStore.getAll() } } }
     )
 
-    // 🚀 ნაბიჯი 1: IBAN-ების ამოღება პროფილებიდან (ბანკის Split-ისთვის აუცილებელია)
+    // 🚀 ნაბიჯი 1: IBAN-ების წამოღება
     const { data: brandProf } = await supabase.from('profiles').select('iban').eq('id', brandId).single()
     const { data: influProf } = await supabase.from('profiles').select('iban').eq('id', influencerId).single()
 
-    // 🛡️ ნაბიჯი 2: ტრანზაქციის შექმნა ზუსტად თქვენი SQL სვეტების მიხედვით
+    // 🛡️ ნაბიჯი 2: ტრანზაქციის რეგისტრაცია
     const { data: tx, error: txError } = await supabase
       .from('transactions')
       .insert([{
-        bill_amount: amount,          // 100
-        final_amount: finalAmount,    // 85
-        amount: amount,               // 100 (თქვენი SQL სქემის შესაბამისად)
+        bill_amount: amount,
+        final_amount: finalAmount,
+        amount: amount,
         brand_id: brandId,
         influencer_id: influencerId,
         deal_id: dealId,
         discount_percent: discountPercent,
         commission_percent: commissionPercent,
-        brand_earned: brandEarned,    // 70
-        influencer_earned: influencerEarned, // 15
+        brand_earned: brandEarned,
+        influencer_earned: influencerEarned,
         brand_iban: brandProf?.iban || '',
         influencer_iban: influProf?.iban || '',
-        status: 'pending',            // ⏳ ბანკის დასტურამდე ტრანზაქცია პენდინგია
+        status: 'pending',
         system_fee: 0
       }])
       .select()
@@ -52,8 +52,7 @@ export async function POST(request: Request) {
 
     if (txError) throw txError
 
-    // 🏦 ხვალ აქ ჩაჯდება ბანკის რეალური Checkout ლინკი.
-    // ამ ეტაპზე გადავდივართ ჩვენსავე წარმატების გვერდზე:
+    // 🏦 ხვალ აქ ჩაჯდება ბანკის (TBC/BOG) რეალური Checkout ლინკი.
     const bankCheckoutUrl = `/payment/success?txid=${tx.id}` 
 
     return NextResponse.json({ checkoutUrl: bankCheckoutUrl })
