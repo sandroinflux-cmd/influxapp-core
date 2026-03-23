@@ -30,7 +30,8 @@ function ClaimContent() {
           brand: d.deals?.title || 'MATRIX NODE',
           offer: `${d.user_discount_pct || 0}% OFF`,
           logo: d.deals?.logo || '💎',
-          backIntelPhone: d.deals?.intel?.phone || 'Secret Node'
+          backIntelPhone: d.deals?.intel?.phone || 'Secret Node',
+          intel: d.deals?.intel || {}
         })))
       }
     } catch (err) { console.error(err) } finally { setLoading(false) }
@@ -40,7 +41,6 @@ function ClaimContent() {
     const existing = localStorage.getItem('matrix_user_wallet')
     let wallet = existing ? JSON.parse(existing) : []
     
-    // ვინახავთ ერთ ობიექტად
     const tokenToSave = { profile, liveDeals }
     
     if (!wallet.find((t: any) => t.profile.id === profile.id)) {
@@ -48,7 +48,6 @@ function ClaimContent() {
       localStorage.setItem('matrix_user_wallet', JSON.stringify(wallet))
     }
 
-    // 🚀 გადავდივართ საფულეში უშეცდომოდ
     window.location.href = '/wallet'
   }
 
@@ -56,22 +55,19 @@ function ClaimContent() {
 
   return (
     <main className="min-h-screen bg-[#010201] flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* ენერგიის ფონი ტოკენის უკან */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#10b98115,transparent_70%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#10b98108,transparent_70%)] pointer-events-none" />
       
-      <div className="z-10 flex flex-col items-center w-full max-w-[420px]">
-        {/* აქ ვძახებთ მთავარ ტოკენს */}
-        <InfluXCard profile={profile} liveDeals={liveDeals}>
+      {/* 🚀 ზომა გასწორებულია 340px-ზე, როგორც ვოლეტში */}
+      <div className="z-10 flex flex-col items-center w-full max-w-[340px]">
+        <InfluXCard profile={profile} liveDeals={liveDeals} disableRotation={false}>
           
-          {/* 🚀 ღილაკი ახლა ცენტრშია და ზუსტად ტექსტის პროპორციულია */}
-          <div className="mt-8 flex justify-center w-full">
-            <button 
-              onClick={handleSync} 
-              className="px-12 py-4 bg-white text-black rounded-full font-black text-[11px] uppercase tracking-[0.4em] hover:bg-emerald-500 hover:text-white transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.05)] hover:shadow-[0_0_40px_rgba(16,185,129,0.3)] italic active:scale-95"
-            >
-              GET IT
-            </button>
-          </div>
+          {/* 🚀 ღილაკი იდენტურია ვოლეტის სტილის */}
+          <button 
+            onClick={handleSync} 
+            className="px-12 py-3.5 bg-white text-black rounded-full font-black text-[11px] uppercase tracking-[0.4em] hover:bg-emerald-500 hover:text-white transition-all duration-500 shadow-[0_0_30px_rgba(255,255,255,0.1)] italic active:scale-95 whitespace-nowrap"
+          >
+            GET ASSET
+          </button>
           
         </InfluXCard>
       </div>

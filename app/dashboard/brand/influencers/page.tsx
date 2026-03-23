@@ -110,9 +110,21 @@ export default function BrandInfluencersPage() {
             incomingRequests.map(req => (
               <div key={req.id} className="bg-[#040d08] border border-blue-500/20 rounded-[40px] p-10 flex flex-col justify-between group">
                 <div>
-                  <span className="text-blue-500 text-[9px] tracking-widest block mb-2 italic uppercase">Incoming Connection</span>
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="text-blue-500 text-[9px] tracking-widest block italic uppercase">Incoming Connection</span>
+                    
+                    {/* ✅ შემოსული მოთხოვნის გამომგზავნის ავატარი (ოდნავ გავზარდე აქაც) */}
+                    <div className="h-16 w-16 rounded-[20px] bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden">
+                      {req.sender?.avatar_url ? (
+                        <img src={req.sender.avatar_url} alt="avatar" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-lg">💎</span>
+                      )}
+                    </div>
+                  </div>
+                  
                   <h3 className="text-2xl italic font-black">{req.sender?.full_name}</h3>
-                  <p className="text-xs text-gray-500 lowercase font-sans opacity-60 mb-6 italic">"{req.message}"</p>
+                  <p className="text-xs text-gray-500 lowercase font-sans opacity-60 mb-6 italic mt-2">"{req.message}"</p>
                 </div>
                 <div className="flex gap-4">
                   <button onClick={() => setConfirmingReq(req)} className="flex-1 py-4 bg-white text-black rounded-2xl text-[10px] font-black italic">Confirm</button>
@@ -123,7 +135,16 @@ export default function BrandInfluencersPage() {
           ) : (
             influencers.filter(inf => filter === 'PARTNERS' ? inf.isPartner : !inf.isPartner).map(inf => (
               <div key={inf.id} className="bg-[#040d08]/60 border border-white/5 rounded-[45px] p-10 flex flex-col items-center gap-6 group hover:border-blue-500/30 transition-all">
-                <div className="h-20 w-20 rounded-[30px] bg-white/[0.03] border border-white/10 flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 transition-transform">💎</div>
+                
+                {/* 🚀 ორჯერ გაზრდილი ავატარი (h-40 w-40, მომრგვალებული კუთხეებით) */}
+                <div className="h-40 w-40 rounded-[40px] bg-white/[0.03] border border-white/10 flex items-center justify-center text-6xl shadow-inner group-hover:scale-105 transition-transform overflow-hidden relative">
+                  {inf.avatar_url ? (
+                    <img src={inf.avatar_url} alt={inf.full_name} className="absolute inset-0 h-full w-full object-cover" />
+                  ) : (
+                    <span>💎</span>
+                  )}
+                </div>
+
                 <h3 className="text-xl font-black italic">{inf.full_name}</h3>
                 <button onClick={() => setSelectedInf(inf)} disabled={inf.isPartner}
                   className={`w-full py-4 rounded-2xl text-[10px] tracking-widest italic font-black transition-all ${inf.isPartner ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' : 'bg-white text-black hover:bg-blue-600 hover:text-white'}`}>
@@ -135,6 +156,7 @@ export default function BrandInfluencersPage() {
         </div>
       )}
 
+      {/* MODAL (დარჩა უცვლელი) */}
       <AnimatePresence>
         {(selectedInf || confirmingReq) && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 backdrop-blur-xl bg-black/80 font-black italic uppercase">
@@ -159,7 +181,6 @@ export default function BrandInfluencersPage() {
                         onClick={() => setSelectedDealId(deal.id)} 
                         className={`p-4 rounded-[25px] border cursor-pointer transition-all flex items-center gap-4 ${selectedDealId === deal.id ? 'bg-blue-600/20 border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.1)]' : 'bg-white/[0.02] border-white/5 hover:border-white/20'}`}
                       >
-                        {/* ✅ ლოგოს შემოწმება: თუ URL-ია, ვხატავთ იმიჯს */}
                         <div className="h-12 w-12 rounded-xl bg-white/5 border border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden">
                           {deal.logo?.startsWith('http') ? (
                             <img src={deal.logo} alt="" className="h-full w-full object-cover" />

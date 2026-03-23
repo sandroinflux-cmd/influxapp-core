@@ -64,7 +64,6 @@ export default function InfluencerMarketplace() {
     setIsSubmitting(true)
     const { data: { user } } = await supabase.auth.getUser()
     
-    // 1. ვამატებთ პარტნიორობას
     const { error: partError } = await supabase.from('partnerships').insert([{
       brand_id: activeOffer.sender_id,
       influencer_id: user?.id,
@@ -80,7 +79,6 @@ export default function InfluencerMarketplace() {
       return
     }
 
-    // 2. ვაახლებთ მოთხოვნის სტატუსს
     await supabase.from('requests').update({ status: 'accepted' }).eq('id', activeOffer.id)
     
     alert("NODE ACTIVATED: DEAL IS LIVE IN YOUR VAULT")
@@ -111,7 +109,6 @@ export default function InfluencerMarketplace() {
           offers.map(offer => (
             <div key={offer.id} className="bg-[#040d08] border border-emerald-500/20 rounded-[40px] p-8 flex flex-col justify-between group">
               <div className="flex flex-col items-center gap-4 mb-6">
-                {/* ✅ ლოგოს სწორი რენდერი ბარათზე */}
                 <div className="h-28 w-28 rounded-[24px] bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden relative shadow-lg">
                    {offer.deal?.logo?.startsWith('http') ? (
                      <img src={offer.deal.logo} alt="" className="absolute inset-0 h-full w-full object-cover filter brightness-105" />
@@ -130,7 +127,16 @@ export default function InfluencerMarketplace() {
         ) : (
           brands.filter(b => filter === 'partners' ? b.isPartner : !b.isPartner).map(brand => (
             <div key={brand.id} className="bg-[#040d08]/60 border border-white/5 rounded-[45px] p-10 flex flex-col items-center gap-6 group hover:border-emerald-500/30 transition-all">
-              <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-3xl">💎</div>
+              
+              {/* 🚀 ლოგოს კონტეინერი - გაზრდილი ზომით (h-32 w-32) */}
+              <div className="h-32 w-32 rounded-[32px] bg-white/[0.03] border border-white/10 flex items-center justify-center overflow-hidden relative shadow-xl transition-all group-hover:border-emerald-500/50">
+                {brand.avatar_url ? (
+                  <img src={brand.avatar_url} alt={brand.full_name} className="absolute inset-0 h-full w-full object-cover filter brightness-110" />
+                ) : (
+                  <span className="text-5xl opacity-20 italic">🏢</span>
+                )}
+              </div>
+
               <h3 className="text-2xl text-center">{brand.full_name}</h3>
               <button onClick={() => setSelectedBrand(brand)} disabled={brand.isPartner} className={`w-full py-5 rounded-[25px] text-[10px] tracking-widest italic font-black ${brand.isPartner ? 'bg-emerald-500/5 text-emerald-500' : 'bg-white text-black hover:bg-emerald-500'}`}>
                 {brand.isPartner ? 'Secured Node' : 'Initialize Connection'}
@@ -145,11 +151,8 @@ export default function InfluencerMarketplace() {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 backdrop-blur-md">
             <div className="absolute inset-0 bg-black/90" onClick={() => setActiveOffer(null)} />
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="relative bg-[#020502] border border-emerald-500/30 rounded-[60px] p-12 pt-16 max-w-md w-full shadow-2xl">
-              
               <button onClick={() => setActiveOffer(null)} className="absolute top-8 right-8 h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-500 hover:text-white transition-all">X</button>
-
               <div className="flex flex-col items-center text-center mb-8">
-                {/* ✅ ლოგოს სწორი რენდერი REVIEW ფანჯარაში */}
                 <div className="w-32 h-32 mb-6 bg-white/[0.03] rounded-[28px] border border-white/10 flex items-center justify-center overflow-hidden relative shadow-[0_0_40px_rgba(16,185,129,0.15)]">
                    {activeOffer.deal?.logo?.startsWith('http') ? (
                      <img src={activeOffer.deal.logo} alt="" className="absolute inset-0 h-full w-full object-cover filter brightness-105" />
@@ -160,19 +163,11 @@ export default function InfluencerMarketplace() {
                 <h2 className="text-4xl uppercase tracking-tighter leading-none mb-2">{activeOffer.sender?.full_name}</h2>
                 <p className="text-emerald-500 text-[10px] tracking-[0.4em] uppercase mt-2">{activeOffer.deal?.title}</p>
               </div>
-
               <div className="text-center mb-10">
                 <h3 className="text-[110px] font-black italic tracking-tighter text-white leading-none drop-shadow-[0_0_20px_rgba(16,185,129,0.3)]">
                   {activeOffer.proposed_percentage}<span className="text-4xl not-italic font-light ml-1 text-emerald-500">%</span>
                 </h3>
               </div>
-
-              {activeOffer.message && (
-                <div className="mb-10 bg-white/[0.02] border border-white/5 p-6 rounded-3xl text-center">
-                  <p className="text-sm text-gray-300 font-sans lowercase opacity-80 leading-relaxed italic">"{activeOffer.message}"</p>
-                </div>
-              )}
-
               <div className="flex gap-4">
                 <button onClick={handleAcceptOffer} disabled={isSubmitting} className="flex-1 py-5 bg-emerald-500 text-black rounded-3xl text-[11px] tracking-widest hover:scale-105 transition-all font-black uppercase italic shadow-[0_0_30px_rgba(16,185,129,0.4)]">
                   Accept Deal

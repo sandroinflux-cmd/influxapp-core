@@ -49,7 +49,8 @@ export default function AuthPage() {
           password,
           options: { 
             data: { role, full_name: fullName },
-            emailRedirectTo: `${window.location.origin}/auth/callback`
+            // 🚀 აქ დაემატა ?next=/dashboard
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`
           }
         })
         if (error) throw error
