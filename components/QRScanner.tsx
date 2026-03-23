@@ -20,7 +20,11 @@ export default function QRScanner({ onScanSuccess, onScanError }: QRScannerProps
           fps: 10, 
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
-          showTorchButtonIfSupported: true 
+          showTorchButtonIfSupported: true,
+          // 📷 აიძულებს ტელეფონს გახსნას უკანა (მთავარი) კამერა:
+          videoConstraints: {
+            facingMode: "environment"
+          }
         }, 
         false
       )
@@ -59,7 +63,7 @@ export default function QRScanner({ onScanSuccess, onScanError }: QRScannerProps
   }, [onScanSuccess, onScanError])
 
   return (
-    <div className="w-full overflow-hidden rounded-[30px] border-2 border-emerald-500/20 shadow-[0_0_40px_rgba(16,185,129,0.1)] bg-black">
+    <div className="w-full overflow-hidden rounded-[30px] border-2 border-emerald-500/20 shadow-[0_0_40px_rgba(16,185,129,0.1)] bg-black relative z-10">
       {/* ეს ID აუცილებელია html5-qrcode-სთვის */}
       <div id="matrix-qr-reader" className="w-full !border-none [&>div]:!border-none"></div>
       
