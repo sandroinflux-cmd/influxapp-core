@@ -18,6 +18,7 @@ function SuccessContent() {
     if (txId) {
       fetchTransactionDetails()
     } else {
+      console.error("No Transaction ID provided in URL")
       setLoading(false)
       setError(true)
     }
@@ -25,31 +26,48 @@ function SuccessContent() {
 
   const fetchTransactionDetails = async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true)
+      // 🔍 ყურადღება: დარწმუნდით რომ თეიბლის სახელები და კავშირები (Foreign Keys) სწორია
+      const { data, error: sbError } = await supabase
         .from('transactions')
         .select(`
           *,
-          deals (*, brands(*))
+          deals (*)
         `)
         .eq('id', txId)
         .single()
 
-      if (error || !data) throw error
+      if (sbError) {
+        console.error("Supabase Logic Error:", sbError.message, sbError.details)
+        throw sbError
+      }
+
+      if (!data) {
+        console.error("Transaction found but data is null")
+        throw new Error("No data found")
+      }
+
       setTxData(data)
-    } catch (err) {
-      console.error("Sync Error:", err)
+    } catch (err: any) {
+      console.error("Sync Error Detailed:", err)
       setError(true)
     } finally {
       setLoading(false)
     }
   }
 
-  // 🛡️ Error State (თუ ბმული გატეხილია)
   if (error) {
     return (
       <div className="min-h-screen bg-[#010201] flex flex-col items-center justify-center p-6 text-center">
-        <p className="text-red-500 font-black uppercase tracking-widest mb-6 italic">Signal Lost: Transaction Not Found</p>
-        <button onClick={() => router.push('/wallet')} className="px-8 py-3 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-all italic">
+        <div className="w-16 h-16 border border-red-500/20 rounded-full flex items-center justify-center mb-6">
+          <span className="text-red-500 text-2xl">!</span>
+        </div>
+        <p className="text-red-500 font-black uppercase tracking-widest mb-2 italic text-sm">Signal Connection Lost</p>
+        <p className="text-gray-600 text-[10px] uppercase mb-8">Transaction verification failed or access denied.</p>
+        <button 
+          onClick={() => router.push('/wallet')} 
+          className="px-10 py-3 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition-all italic"
+        >
           [ Return to Base ]
         </button>
       </div>
