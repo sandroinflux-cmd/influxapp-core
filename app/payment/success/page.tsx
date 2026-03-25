@@ -12,58 +12,53 @@ function SuccessContent() {
 
   const [txData, setTxData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null) // 🔍 ერორის დეტალების შემნახველი
 
   useEffect(() => {
     if (txId) {
       fetchTransactionDetails()
     } else {
-      console.error("No Transaction ID provided in URL")
+      // ვამოწმებთ, ბანკმა ხომ არ ჩაანაცვლა ჩვენი ლინკი
+      const allParams = searchParams.toString()
+      setErrorMsg(`URL ERROR: txid is missing. Current parameters: ${allParams}`)
       setLoading(false)
-      setError(true)
     }
-  }, [txId])
+  }, [txId, searchParams])
 
   const fetchTransactionDetails = async () => {
     try {
       setLoading(true)
-      // 🔍 ყურადღება: დარწმუნდით რომ თეიბლის სახელები და კავშირები (Foreign Keys) სწორია
       const { data, error: sbError } = await supabase
         .from('transactions')
-        .select(`
-          *,
-          deals (*)
-        `)
+        .select('*, deals (*)')
         .eq('id', txId)
         .single()
 
-      if (sbError) {
-        console.error("Supabase Logic Error:", sbError.message, sbError.details)
-        throw sbError
-      }
-
-      if (!data) {
-        console.error("Transaction found but data is null")
-        throw new Error("No data found")
-      }
+      if (sbError) throw sbError
+      if (!data) throw new Error("Transaction not found in database")
 
       setTxData(data)
     } catch (err: any) {
-      console.error("Sync Error Detailed:", err)
-      setError(true)
+      // 🔍 ვიჭერთ ზუსტ ერორს Supabase-დან
+      setErrorMsg(`DATABASE ERROR: ${err.message || JSON.stringify(err)}`)
     } finally {
       setLoading(false)
     }
   }
 
-  if (error) {
+  if (errorMsg) {
     return (
       <div className="min-h-screen bg-[#010201] flex flex-col items-center justify-center p-6 text-center">
         <div className="w-16 h-16 border border-red-500/20 rounded-full flex items-center justify-center mb-6">
           <span className="text-red-500 text-2xl">!</span>
         </div>
-        <p className="text-red-500 font-black uppercase tracking-widest mb-2 italic text-sm">Signal Connection Lost</p>
-        <p className="text-gray-600 text-[10px] uppercase mb-8">Transaction verification failed or access denied.</p>
+        <p className="text-red-500 font-black uppercase tracking-widest mb-2 italic text-sm">System Error X-Ray</p>
+        
+        {/* 🔴 ზუსტი ერორი გამოჩნდება აქ! */}
+        <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-lg mb-8 max-w-md w-full">
+          <p className="text-red-400 text-[10px] font-mono break-words lowercase">{errorMsg}</p>
+        </div>
+
         <button 
           onClick={() => router.push('/wallet')} 
           className="px-10 py-3 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition-all italic"
