@@ -12,34 +12,46 @@ function SuccessContent() {
 
   const [txData, setTxData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null) // 🔍 ერორის დეტალების შემნახველი
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
     if (txId) {
       fetchTransactionDetails()
     } else {
-      // ვამოწმებთ, ბანკმა ხომ არ ჩაანაცვლა ჩვენი ლინკი
-      const allParams = searchParams.toString()
-      setErrorMsg(`URL ERROR: txid is missing. Current parameters: ${allParams}`)
+      setErrorMsg(`URL ERROR: txid is missing.`)
       setLoading(false)
     }
-  }, [txId, searchParams])
+  }, [txId])
 
   const fetchTransactionDetails = async () => {
     try {
       setLoading(true)
-      const { data, error: sbError } = await supabase
+
+      // 🛡️ 1. ჯერ ამოგვაქვს მხოლოდ ტრანზაქცია (ბაზის ერორის ასარიდებლად)
+      const { data: tx, error: txError } = await supabase
         .from('transactions')
-        .select('*, deals (*)')
+        .select('*')
         .eq('id', txId)
         .single()
 
-      if (sbError) throw sbError
-      if (!data) throw new Error("Transaction not found in database")
+      if (txError) throw txError
+      if (!tx) throw new Error("Transaction not found")
 
-      setTxData(data)
+      // 🛡️ 2. თუ ტრანზაქციას აქვს deal_id, ცალკე ამოგვაქვს Deal და მისი Brand (ჩეკისთვის)
+      let dealData = null
+      if (tx.deal_id) {
+        // აქ ბრენდსაც ვაყოლებთ, რომ ჩეკზე კომპანიის სახელი ლამაზად დაიწეროს
+        const { data: d } = await supabase
+          .from('deals')
+          .select('*, brands(*)')
+          .eq('id', tx.deal_id)
+          .single()
+        dealData = d
+      }
+
+      // 🛡️ 3. ვაერთიანებთ მონაცემებს და ვაწვდით ჩეკს!
+      setTxData({ ...tx, deals: dealData })
     } catch (err: any) {
-      // 🔍 ვიჭერთ ზუსტ ერორს Supabase-დან
       setErrorMsg(`DATABASE ERROR: ${err.message || JSON.stringify(err)}`)
     } finally {
       setLoading(false)
@@ -53,12 +65,9 @@ function SuccessContent() {
           <span className="text-red-500 text-2xl">!</span>
         </div>
         <p className="text-red-500 font-black uppercase tracking-widest mb-2 italic text-sm">System Error X-Ray</p>
-        
-        {/* 🔴 ზუსტი ერორი გამოჩნდება აქ! */}
         <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-lg mb-8 max-w-md w-full">
           <p className="text-red-400 text-[10px] font-mono break-words lowercase">{errorMsg}</p>
         </div>
-
         <button 
           onClick={() => router.push('/wallet')} 
           className="px-10 py-3 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition-all italic"
