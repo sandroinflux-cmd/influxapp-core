@@ -8,11 +8,10 @@ export async function POST(request: Request) {
     
     console.log("💳 BOG Callback Received:", JSON.stringify(payload, null, 2))
 
-    // 🚀 მთავარი მაგია: საქართველოს ბანკი მონაცემებს აგზავნის "body" ობიექტში!
     const eventData = payload.body || payload; 
 
-    const bogStatus = eventData.status 
-    // ვიჭერთ ჩვენს ID-ს, სადაც არ უნდა გამოაგზავნოს ბანკმა
+    // 🚀 ფიქსი: საქართველოს ბანკი სტატუსს აგზავნის order_status.key-ში და არის "completed"
+    const bogStatus = eventData.order_status?.key || eventData.status;
     const txId = eventData.external_order_id || eventData.order_id || eventData.shop_order_id
 
     if (!txId) {
@@ -25,23 +24,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 })
     }
 
-    // 🛡️ ვქმნით სუპერ-ადმინის კლიენტს 
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY! 
     )
 
-    // ახალი სტატუსის გარკვევა
+    // 🚀 სტატუსის გარკვევა (გავითვალისწინეთ "completed")
     let newStatus = 'pending'
-    if (bogStatus === 'success' || bogStatus === 'APPROVED' || bogStatus === 'IN_PROGRESS') {
+    const normalizedStatus = bogStatus?.toLowerCase() || '';
+
+    if (normalizedStatus === 'completed' || normalizedStatus === 'success' || normalizedStatus === 'approved') {
       newStatus = 'approved'
-    } else if (bogStatus === 'error' || bogStatus === 'REJECTED' || bogStatus === 'fail' || bogStatus === 'failed') {
+    } else if (normalizedStatus === 'error' || normalizedStatus === 'rejected' || normalizedStatus === 'failed') {
       newStatus = 'rejected'
     }
 
-    console.log(`🔄 Attempting to update TX: ${txId} to status: ${newStatus}`)
+    console.log(`🔄 Attempting to update TX: ${txId} from BOG status '${bogStatus}' to our DB status '${newStatus}'`)
 
-    // ვანახლებთ სტატუსს Supabase-ში
     const { data, error: updateError } = await supabaseAdmin
       .from('transactions')
       .update({ status: newStatus })
@@ -59,7 +58,6 @@ export async function POST(request: Request) {
       console.log("✅ DB Update Success! Transaction Approved.")
     }
 
-    // ბანკს ვუბრუნებთ 200 OK-ს
     return NextResponse.json({ message: "Callback processed successfully" }, { status: 200 })
 
   } catch (error: any) {
