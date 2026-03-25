@@ -110,7 +110,7 @@ export async function POST(request: Request) {
       .insert([{
         bill_amount: amount,
         final_amount: finalAmount,
-        amount: finalAmount, // ბანკს ვაწვდით საბოლოო (ფასდაკლებულ) თანხას!
+        amount: amount, // 🎯 გასწორდა: აქ ვინახავთ ორიგინალ თანხას (Bill Amount) ტრიგერის ერორის ასარიდებლად!
         brand_id: brandId,
         influencer_id: influencerId,
         deal_id: dealId,
@@ -130,6 +130,7 @@ export async function POST(request: Request) {
 
     // 🏦 ბანკის API-სთან დაკავშირება
     const bogToken = await getBogToken()
+    // 🎯 ყურადღება: ბანკს ვუგზავნით finalAmount-ს, ამიტომ ბანკი ისევ 0.80 ლარს ჩამოჭრის!
     const bogOrder = await createBogOrder(bogToken, tx.id, finalAmount)
 
     // ვპოულობთ სარეკირექტო ლინკს ბანკის პასუხიდან
