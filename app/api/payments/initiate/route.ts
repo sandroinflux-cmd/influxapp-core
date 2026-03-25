@@ -47,10 +47,14 @@ async function createBogOrder(token: string, txId: string, amount: number) {
     body: JSON.stringify({
       callback_url: `${siteUrl}/api/payments/callback`, // 👈 ბანკი აქ გამოაგზავნის სტატუსს
       external_order_id: txId, // ჩვენი ბაზის ტრანზაქციის ID (რომ ვაკონტროლოთ)
-      purchase_units: {
-        currency: 'GEL',
-        total_amount: amount.toString() // ბანკი ითხოვს string ფორმატს, მაგ: "15.50"
-      },
+      // 🚨 გასწორდა: ბანკი ითხოვს Array-ს (კვადრატულ ფრჩხილებს)
+      purchase_units: [
+        {
+          currency: 'GEL',
+          // 🚨 გასწორდა: ბანკი ითხოვს ზუსტად 2 ათწილადს (მაგ: "1.00")
+          total_amount: amount.toFixed(2) 
+        }
+      ],
       redirect_urls: {
         success: `${siteUrl}/payment/success?txid=${txId}`, // 👈 ფულის ჩამოჭრის მერე სად დაბრუნდეს
         fail: `${siteUrl}/payment/fail?txid=${txId}`
@@ -59,9 +63,10 @@ async function createBogOrder(token: string, txId: string, amount: number) {
   })
 
   if (!response.ok) {
-    const errorData = await response.json()
-    console.error("BOG Order Creation Error:", errorData)
-    throw new Error('Failed to create order in BOG')
+    // 🔍 თუ ერორია, დეტალურად ვლოგავთ, რომ გავიგოთ ზუსტად რა არ მოეწონა ბანკს
+    const errorData = await response.json().catch(() => ({}))
+    console.error("BOG Order Creation Error Details:", JSON.stringify(errorData, null, 2))
+    throw new Error(`BOG Rejected: ${errorData?.error_message || errorData?.message || 'Check Vercel Logs'}`)
   }
 
   return await response.json()
