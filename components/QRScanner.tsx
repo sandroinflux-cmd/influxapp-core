@@ -1,8 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { QrReader } from 'react-qr-reader'
-import jsQR from 'jsqr'
+import { useEffect, useRef, useState } from 'react'
+import { Html5Qrcode } from 'html5-qrcode'
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void
@@ -10,79 +9,79 @@ interface QRScannerProps {
 }
 
 export default function QRScanner({ onScanSuccess, onScanError }: QRScannerProps) {
+  const scannerRef = useRef<Html5Qrcode | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isProcessingFile, setIsProcessingFile] = useState(false)
 
-  // 📷 კამერის სკანირების დამუშავება
-  const handleCameraScan = (result: any, error: any) => {
-    if (result) {
-      onScanSuccess(result?.text)
-    }
-    if (error && onScanError) {
-      // ვაიგნორებთ ჩვეულებრივ "QR ვერ ვიპოვე" ერორებს, რომ კონსოლი არ გადაივსოს
-      if (error?.name !== 'NotFoundException') {
-        onScanError(error)
+  useEffect(() => {
+    let isMounted = true;
+
+    const startScanner = async () => {
+      try {
+        scannerRef.current = new Html5Qrcode("matrix-qr-reader")
+        
+        await scannerRef.current.start(
+          { facingMode: "environment" },
+          { 
+            fps: 10, 
+            // 🚀 დინამიური ჩარჩო: ყოველთვის ეკრანის 70% იქნება და ზუსტ კვადრატს შექმნის!
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+              const size = Math.floor(minEdge * 0.7);
+              return { width: size, height: size };
+            },
+            aspectRatio: 1.0 
+          },
+          (decodedText) => {
+            if (isMounted && scannerRef.current) {
+              scannerRef.current.stop().catch(() => {})
+              onScanSuccess(decodedText)
+            }
+          },
+          (err) => {
+            if (isMounted && onScanError) onScanError(err)
+          }
+        )
+      } catch (err) {
+        console.error("Camera error:", err)
       }
     }
-  }
 
-  // 📁 ფაილის (სურათის) ატვირთვის დამუშავება (jsQR ბიბლიოთეკით)
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    startScanner()
+
+    return () => {
+      isMounted = false;
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {})
+        scannerRef.current.clear()
+      }
+    }
+  }, [onScanSuccess, onScanError])
+
+  // 📁 ფაილის ატვირთვა სტაბილური მეთოდით
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     setIsProcessingFile(true)
-    const reader = new FileReader()
-    
-    reader.onload = (event) => {
-      const img = new Image()
-      img.onload = () => {
-        // ვქმნით ვირტუალურ Canvas-ს სურათის წასაკითხად
-        const canvas = document.createElement('canvas')
-        canvas.width = img.width
-        canvas.height = img.height
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          setIsProcessingFile(false)
-          return
-        }
-        
-        ctx.drawImage(img, 0, 0, img.width, img.height)
-        const imageData = ctx.getImageData(0, 0, img.width, img.height)
-        
-        // ვასკანერებთ jsQR-ით
-        const code = jsQR(imageData.data, imageData.width, imageData.height)
-        
-        if (code) {
-          onScanSuccess(code.data)
-        } else {
-          alert("QR Code not found in the image. Please try a clearer image.")
-        }
-        setIsProcessingFile(false)
-      }
-      img.src = event.target?.result as string
+    try {
+      // ვქმნით დროებით ინსტანსს მხოლოდ სურათის წასაკითხად
+      const tempScanner = new Html5Qrcode("matrix-qr-reader")
+      const decodedText = await tempScanner.scanFile(file, true)
+      onScanSuccess(decodedText)
+    } catch (err) {
+      alert("QR Code not found in the image. Please try a clearer image.")
+    } finally {
+      setIsProcessingFile(false)
     }
-    reader.readAsDataURL(file)
   }
 
   return (
     <div className="w-full flex flex-col items-center relative z-10 space-y-6">
       
-      {/* 📹 კამერის სკანერი */}
+      {/* 📹 კამერის სკანერი დინამიური ჩარჩოთი */}
       <div className="w-full max-w-sm overflow-hidden rounded-[30px] border-2 border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-black relative">
-        {/* ლამაზი მწვანე ჩარჩო (Viewfinder) */}
-        <div className="absolute inset-0 z-20 pointer-events-none border-[40px] border-black/50" />
-        
-        <div className="relative z-10 h-[300px] w-full">
-          <QrReader
-            onResult={handleCameraScan}
-            constraints={{ facingMode: 'environment' }}
-            containerStyle={{ width: '100%', height: '100%' }}
-            videoStyle={{ objectFit: 'cover', width: '100%', height: '100%' }}
-          />
-        </div>
-        
-        {/* Matrix პულსაცია */}
+        <div id="matrix-qr-reader" className="w-full h-[320px] object-cover [&>video]:object-cover"></div>
         <div className="absolute top-1/2 left-0 w-full h-1 bg-emerald-500/80 animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_15px_#10b981] z-30" />
       </div>
       

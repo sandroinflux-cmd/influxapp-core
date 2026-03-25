@@ -10,25 +10,25 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
   const [isDownloading, setIsDownloading] = useState(false)
   
   const savings = (originalAmount || 0) - total;
-  const brandName = deal?.brands?.name || "Global Partner";
+  
+  // 🚀 100%-ით ზუსტი ბრენდის სახელი (Wallet-ის ლოგიკიდან)
+  const brandName = deal?.brand || "GLOBAL PARTNER";
 
   useEffect(() => {
     setHash(Math.random().toString(36).substr(2, 10).toUpperCase())
     const timer = setInterval(() => setTime(new Date()), 1000)
     
-    // 🚀 ვიღებთ ინფლუენსერის მონაცემებს ლოკალური მეხსიერებიდან
     const token = JSON.parse(localStorage.getItem('matrix_active_token') || '{}')
     if (token?.profile) setInfluencer(token.profile)
       
     return () => clearInterval(timer)
   }, [])
 
-  // 🚀 PDF გენერატორი ეგრევე ჩამოსატვირთად
+  // 🚀 PDF გენერატორი გაუმჯობესებული ფორმატით (შუაზე აღარ გაჭრის!)
   const handlePrint = () => {
     setIsDownloading(true)
     const element = document.getElementById('receipt-wrapper')
     
-    // დინამიურად ვტვირთავთ html2pdf ბიბლიოთეკას
     const script = document.createElement('script')
     script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
     script.onload = () => {
@@ -36,8 +36,9 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
         margin: 0,
         filename: `INFLUX_${brandName}_${hash}.pdf`,
         image: { type: 'jpeg', quality: 1 },
+        // 🚀 [4.5, 7.5] არის მობილური ეკრანის პროპორცია, ამიტომ 1 გვერდზე დაეტევა იდეალურად!
         html2canvas: { scale: 3, useCORS: true, backgroundColor: '#020402' },
-        jsPDF: { unit: 'in', format: 'a5', orientation: 'portrait' }
+        jsPDF: { unit: 'in', format: [4.5, 7.5], orientation: 'portrait' } 
       }
       // @ts-ignore
       window.html2pdf().set(opt).from(element).save().then(() => setIsDownloading(false))
@@ -48,7 +49,6 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
   return (
     <div className="fixed inset-0 z-[300] bg-black/98 backdrop-blur-3xl flex flex-col items-center justify-center p-4 overflow-hidden font-sans">
       
-      {/* 🌌 Background Ambience */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
         {[...Array(2)].map((_, i) => (
           <motion.div
@@ -67,7 +67,6 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
         animate={{ y: 0, opacity: 1 }}
         className="relative w-full max-w-[340px] bg-[#020402]/90 border border-white/20 rounded-[45px] shadow-[0_0_120px_rgba(16,185,129,0.1)] overflow-hidden backdrop-blur-3xl"
       >
-        {/* 💵 Bold Phosphorescent Watermarks */}
         <div className="absolute inset-0 opacity-[0.25] pointer-events-none flex flex-wrap gap-x-16 gap-y-14 p-4 rotate-[20deg] z-0 justify-center">
             {[...Array(18)].map((_, i) => (
                 <motion.span 
@@ -81,7 +80,6 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
             ))}
         </div>
 
-        {/* 🚀 Top Security Bar (შეიცვალა სახელით და ავატარით) */}
         <div className="bg-emerald-500/10 border-b border-white/5 p-5 flex justify-between items-center relative overflow-hidden z-10">
           <div className="flex flex-col gap-1.5">
             <div className="flex flex-col">
@@ -97,13 +95,12 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
           <div className="h-12 w-12 rounded-xl bg-black border border-emerald-500/30 flex items-center justify-center relative overflow-hidden shadow-inner shrink-0">
              <motion.div animate={{ top: ["-100%", "200%"] }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }} className="absolute w-full h-[1px] bg-emerald-400 shadow-[0_0_15px_#10b981] z-20" />
              {influencer?.avatar_url 
-               ? <img src={influencer.avatar_url} className="w-full h-full object-cover filter brightness-110" /> 
+               ? <img src={influencer.avatar_url} className="w-full h-full object-cover filter brightness-110" crossOrigin="anonymous" /> 
                : <span className="text-xl">🤖</span>}
           </div>
         </div>
 
         <div className="p-6 space-y-6 relative z-10">
-          {/* 🔴 MERCHANT PROOF */}
           <div className="text-center py-5 bg-red-600/[0.05] rounded-[30px] border border-red-500/30 relative overflow-hidden flex items-center justify-center gap-2 shadow-[inset_0_0_20px_rgba(239,68,68,0.1)]">
             <div className="flex flex-col flex-1 pl-2">
               <span className="text-[8px] font-black text-red-500 uppercase tracking-[0.6em] block mb-1 italic text-left ml-4">Input Amount</span>
@@ -134,7 +131,6 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
             </div>
           </div>
 
-          {/* ⚪ FINAL SETTLE */}
           <div className="text-center relative py-4 bg-white/[0.02] border border-white/5 rounded-[30px]">
             <span className="text-[8px] font-black text-white/30 uppercase tracking-[1em] block mb-1 italic">Settled Matrix</span>
             <h2 className="text-6xl font-black tracking-tighter text-white italic leading-none">
@@ -146,7 +142,6 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
             </div>
           </div>
 
-          {/* 💰 BENEFIT REALIZED */}
           <div className="bg-emerald-500/[0.06] border border-emerald-500/30 rounded-[30px] py-6 flex flex-col items-center justify-center relative overflow-hidden shadow-[0_0_30px_rgba(16,185,129,0.15)]">
             <span className="text-[7px] font-black text-emerald-500 uppercase tracking-[0.6em] mb-1 italic">Benefit Realized</span>
             <motion.span 
@@ -158,7 +153,6 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
             </motion.span>
           </div>
 
-          {/* 🛡️ Data Block */}
           <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-5 font-mono">
             <div className="flex flex-col">
               <span className="text-[5px] font-black text-gray-700 uppercase tracking-widest mb-1">Node Hash</span>
@@ -171,13 +165,11 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
           </div>
         </div>
 
-        {/* 🔒 Trace Mark */}
         <div className="bg-emerald-500/5 py-1.5 text-center border-t border-white/5 relative z-10">
           <span className="text-[4px] font-black text-emerald-500 uppercase tracking-[2em] opacity-30 italic leading-none">IMMUTABLE_MATRIX_ASSET</span>
         </div>
       </motion.div>
 
-      {/* 🚀 ACTIONS (გამოტანილია ქვითრის გარეთ, რომ PDF-ზე არ გამოჩნდეს) */}
       <div className="w-full max-w-[340px] pt-6 flex flex-col gap-3 relative z-10">
         <button 
           onClick={handlePrint} 

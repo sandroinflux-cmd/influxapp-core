@@ -15,15 +15,15 @@ export default function AmountModal({ deal, onConfirm, onCancel }: any) {
   const userDiscount = (raw * userPct) / 100;
   const finalPayable = raw - userDiscount;
 
-  // 🚀 ბრენდის მონაცემების ამოღება
-  const brandName = deal?.brands?.name || deal?.title || 'GLOBAL PARTNER';
-  const brandLogo = deal?.brands?.logo || deal?.logo || '💎';
+  // 🚀 100%-ით ზუსტი ბრენდის სახელი და ლოგო
+  const brandName = deal?.brand || 'GLOBAL PARTNER';
+  const brandLogo = deal?.logo || '💎';
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
       <div className="w-full max-w-[400px] bg-[#050505] border border-blue-500/30 rounded-[35px] p-8 animate-in zoom-in-95 duration-300 shadow-[0_0_80px_rgba(37,99,235,0.2)] relative">
         
-        {/* 🚀 ბრენდის ლოგო და სახელი */}
+        {/* 🚀 ბრენდის ლოგო და სახელი ცენტრში */}
         <div className="flex flex-col items-center mb-8 border-b border-white/5 pb-6">
           <div className="h-14 w-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden mb-3 shadow-inner">
             {brandLogo.startsWith('http') 
