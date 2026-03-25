@@ -26,7 +26,7 @@ export default function LiveFeed() {
       .from('transactions')
       .select('*')
       .eq('influencer_id', user.id)
-      .eq('status', 'success')
+      .eq('status', 'approved') // 🎯 გასწორდა
       .order('created_at', { ascending: false })
       .limit(20)
 
@@ -34,7 +34,6 @@ export default function LiveFeed() {
       setLiveFeed(txs.map(tx => ({
         id: `OWNER_${(tx.token_id || 'UNK').substring(0, 4).toUpperCase()}`,
         brand: brandMap.get(tx.brand_id)?.full_name || 'MATRIX NODE',
-        // 🚀 შესწორებული: აჩვენებს ინფლუენსერის გამომუშავებულ წილს
         spent: Number(tx.influencer_earned).toLocaleString('en-US', { minimumFractionDigits: 2 }),
         location: brandMap.get(tx.brand_id)?.address || 'Digital Node',
         time: timeAgo(tx.created_at),
@@ -46,7 +45,8 @@ export default function LiveFeed() {
 
   useEffect(() => {
     fetchLivePulse()
-    const channel = supabase.channel('live-pulse').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions' }, () => fetchLivePulse()).subscribe()
+    // 🎯 გასწორდა: INSERT შეიცვალა UPDATE-ით
+    const channel = supabase.channel('live-pulse').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions' }, () => fetchLivePulse()).subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [])
 

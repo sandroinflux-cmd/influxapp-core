@@ -18,9 +18,9 @@ export default function AnalyticsPage() {
 
       const { data: txData } = await supabase
         .from('transactions')
-        .select('*') // მოგვაქვს ყველაფერი brand_earned-ის ჩათვლით
+        .select('*')
         .eq('brand_id', user.id)
-        .eq('status', 'success')
+        .eq('status', 'approved') // 🎯 გასწორდა
 
       const { data: profiles } = await supabase.from('profiles').select('id, full_name')
       const profileMap: Record<string, string> = {}
@@ -35,7 +35,6 @@ export default function AnalyticsPage() {
         const infMap: Record<string, { id: string, revenue: number, sales: number }> = {}
 
         txData.forEach(tx => {
-          // 🚀 ვიყენებთ brand_earned-ს (წმინდა მოგება)
           const netAmt = tx.brand_earned || 0 
           totalNetRev += netAmt
 
@@ -112,7 +111,6 @@ export default function AnalyticsPage() {
         </div>
       </header>
 
-      {/* Graphs & Nodes would follow same structure but using Net Revenue */}
       <div className="space-y-10">
         <span className="text-[10px] text-gray-600 tracking-[0.5em] px-8">Influencer Performance (Net Yield)</span>
         <div className="grid grid-cols-1 gap-8">

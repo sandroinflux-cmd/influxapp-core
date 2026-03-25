@@ -51,6 +51,21 @@ function SuccessContent() {
 
       // 🛡️ 3. ვაერთიანებთ მონაცემებს და ვაწვდით ჩეკს!
       setTxData({ ...tx, deals: dealData })
+
+      // 🚀 4. ვინახავთ მომხმარებლის ტელეფონში (ვოლეტის ისტორიისთვის)
+      const savedHistory = JSON.parse(localStorage.getItem('matrix_user_transactions') || '[]')
+      // ვამოწმებთ, უკვე ხომ არ არის შენახული ეს ჩეკი (რეფრეშის დროს რომ არ გაორმაგდეს)
+      if (!savedHistory.find((t: any) => t.id === tx.id)) {
+        savedHistory.unshift({
+          id: tx.id,
+          brandName: dealData?.brands?.name || 'Matrix Partner',
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          paid: tx.final_amount,
+          saved: tx.bill_amount - tx.final_amount
+        })
+        localStorage.setItem('matrix_user_transactions', JSON.stringify(savedHistory.slice(0, 15))) // ვინახავთ მხოლოდ ბოლო 15-ს
+      }
+
     } catch (err: any) {
       setErrorMsg(`DATABASE ERROR: ${err.message || JSON.stringify(err)}`)
     } finally {

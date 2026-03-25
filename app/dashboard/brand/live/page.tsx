@@ -29,32 +29,37 @@ export default function LivePulsePage() {
         .from('transactions')
         .select('*')
         .eq('brand_id', user.id)
-        .eq('status', 'success')
+        .eq('status', 'approved') // 🎯 გასწორდა
         .order('created_at', { ascending: false })
 
       if (allTx) {
         setTransactions(allTx.slice(0, 15))
-        // 🚀 ჯამშიც brand_earned-ს ვითვლით
         const totalNetVal = allTx.reduce((sum, tx) => sum + (tx.brand_earned || 0), 0)
         setStats({ count24h: allTx.length, value24h: totalNetVal })
       }
 
+      // 🎯 Live Pulse განახლება: ვუსმენთ UPDATE ივენთს (რადგან ბანკი status-ს ანახლებს)
       const channel = supabase
         .channel('brand-live-pulse')
         .on('postgres_changes', { 
-            event: 'INSERT', 
+            event: 'UPDATE', 
             schema: 'public', 
             table: 'transactions',
             filter: `brand_id=eq.${user.id}` 
           }, 
           (payload) => {
             const newTx = payload.new
-            setTransactions(prev => [newTx, ...prev].slice(0, 15))
-            setStats(prev => ({
-              count24h: prev.count24h + 1,
-              // 🚀 რეალურ დროში დამატებისასაც brand_earned
-              value24h: prev.value24h + (newTx.brand_earned || 0)
-            }))
+            if (newTx.status === 'approved') {
+              setTransactions(prev => {
+                // ვამოწმებთ, რომ დუბლიკატი არ დავამატოთ ეკრანზე
+                if (prev.some(tx => tx.id === newTx.id)) return prev;
+                return [newTx, ...prev].slice(0, 15);
+              })
+              setStats(prev => ({
+                count24h: prev.count24h + 1,
+                value24h: prev.value24h + (newTx.brand_earned || 0)
+              }))
+            }
           }
         )
         .subscribe()
@@ -93,7 +98,6 @@ export default function LivePulsePage() {
               </div>
               <div className="col-span-1 text-center text-[11px] text-gray-400">NODE_USR_{tx.id.substring(0, 3)}</div>
               <div className="col-span-1 text-center text-blue-500 tracking-widest">${(profileMap[tx.influencer_id] || 'SYS').substring(0, 5).toUpperCase()}</div>
-              {/* 🚀 Net_Value აჩვენებს ბრენდის სუფთა წილს */}
               <div className="col-span-1 text-right text-2xl text-white">
                 {Number(tx.brand_earned || 0).toFixed(2)} <span className="text-[10px] text-gray-500 opacity-40 ml-1">₾</span>
               </div>
@@ -109,7 +113,6 @@ export default function LivePulsePage() {
          <div className="max-w-7xl mx-auto flex justify-between items-center px-12">
             <div className="flex gap-12">
                <div><span className="text-[8px] text-gray-600 block">Total TX</span><p className="text-2xl text-white">{stats.count24h}</p></div>
-               {/* 🚀 Footer-შიც სუფთა მოგება (Net Pulse) */}
                <div><span className="text-[8px] text-blue-500 block">Total Net Pulse</span><p className="text-2xl text-blue-500">{stats.value24h.toLocaleString(undefined, {minimumFractionDigits: 2})} ₾</p></div>
             </div>
             <p className="text-[9px] text-emerald-500 animate-pulse tracking-[0.4em]">Secure Ledger Sync Active</p>

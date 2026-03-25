@@ -33,12 +33,12 @@ export default function BrandDashboardHome() {
           .order('created_at', { ascending: false })
         setDeals(dealsData || [])
 
-        // 🚀 3. ტრანზაქციების წამოღება (ვიყენებთ brand_earned-ს!)
+        // 🚀 3. ტრანზაქციების წამოღება 
         const { data: txData } = await supabase
           .from('transactions')
           .select('brand_earned, created_at')
           .eq('brand_id', user.id)
-          .eq('status', 'success')
+          .eq('status', 'approved') // 🎯 გასწორდა: ბაზაში სტატუსი არის 'approved'
 
         if (txData && txData.length > 0) {
           let revenue = 0;

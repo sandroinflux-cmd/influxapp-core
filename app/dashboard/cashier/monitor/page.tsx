@@ -38,29 +38,71 @@ function MonitorContent() {
   useEffect(() => {
     if (!isActive || !brandId) return
 
+    let timeoutId: NodeJS.Timeout;
+
+    // 🚀 1. ისტორიის წამოღება ჩართვისთანავე, რომ ძველი ტრანზაქციები არ დაიკარგოს
+    const fetchHistory = async () => {
+      const { data } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('brand_id', brandId)
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(50); // მომავალში რო არ გაჭედოს, ბოლო 50-ს ვტოვებთ
+
+      if (data) {
+        const formattedHistory = data.map(tx => {
+          const now = new Date(tx.created_at);
+          return {
+            ...tx,
+            exactTime: now.toLocaleTimeString('ka-GE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          }
+        });
+        setHistory(formattedHistory);
+      }
+    }
+
+    fetchHistory();
+
+    // 🚀 2. რეალურ დროში დაჭერა (მხოლოდ APPROVED-ზე)
     const channel = supabase
       .channel(`terminal-${brandId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'transactions', filter: `brand_id=eq.${brandId}` },
+        { event: 'UPDATE', schema: 'public', table: 'transactions', filter: `brand_id=eq.${brandId}` },
         (payload) => {
-          const now = new Date();
-          const txData = {
-            ...payload.new,
-            exactTime: now.toLocaleTimeString('ka-GE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-          }
+          const newTx = payload.new;
           
-          playPulseTick()
-          setLastPayment(txData)
-          setHistory(prev => [txData, ...prev].slice(0, 10))
-          setStatus('success')
+          if (newTx.status === 'approved') {
+            const now = new Date();
+            const txData = {
+              ...newTx,
+              exactTime: now.toLocaleTimeString('ka-GE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            }
+            
+            playPulseTick()
+            setLastPayment(txData)
+            
+            setHistory(prev => {
+              // ვამოწმებთ რო დუბლიკატი არ ჩაწეროს
+              if (prev.some(tx => tx.id === newTx.id)) return prev;
+              return [txData, ...prev];
+            })
+            
+            setStatus('success')
 
-          setTimeout(() => { setStatus('scanning') }, 40000)
+            // 🚀 3. ტაიმერის განულება და ზუსტად 2 წუთზე (120,000 ms) დაყენება
+            if (timeoutId) clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => { setStatus('scanning') }, 120000)
+          }
         }
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { 
+      supabase.removeChannel(channel);
+      if (timeoutId) clearTimeout(timeoutId);
+    }
   }, [isActive, brandId])
 
   if (!brandId) return <div className="min-h-screen bg-black" />
@@ -68,7 +110,7 @@ function MonitorContent() {
   if (!isActive) {
     return (
       <div className="min-h-screen bg-[#010201] flex items-center justify-center">
-        <button onClick={() => setIsActive(true)} className="bg-emerald-600 text-white px-24 py-10 rounded-[45px] font-black text-xl uppercase tracking-[0.5em] italic shadow-[0_0_60px_rgba(16,185,129,0.3)] border-2 border-white/10">
+        <button onClick={() => setIsActive(true)} className="bg-emerald-600 text-white px-24 py-10 rounded-[45px] font-black text-xl uppercase tracking-[0.5em] italic shadow-[0_0_60px_rgba(16,185,129,0.3)] border-2 border-white/10 hover:scale-105 transition-transform">
           Initialize Terminal
         </button>
       </div>
@@ -89,7 +131,7 @@ function MonitorContent() {
           </div>
         </div>
         <div className="text-right">
-          <p className="text-emerald-500/40 text-[10px] font-black uppercase tracking-[0.4em] italic mb-1">Live Monitor v3.7</p>
+          <p className="text-emerald-500/40 text-[10px] font-black uppercase tracking-[0.4em] italic mb-1">Live Monitor v3.8</p>
           <p className="text-white/40 font-black italic text-xl tracking-widest">{new Date().toLocaleTimeString('ka-GE', {hour: '2-digit', minute:'2-digit'})}</p>
         </div>
       </header>
@@ -115,7 +157,6 @@ function MonitorContent() {
               <div className="relative inline-block px-4">
                 <div className="absolute inset-0 bg-emerald-500/5 blur-[200px] -z-10 rounded-full" />
                 
-                {/* 🚀 ველის სახელი შევცვალე bill_amount-ით */}
                 <h1 className="text-[200px] md:text-[420px] font-black italic tracking-tighter text-white leading-none drop-shadow-[0_0_100px_rgba(255,255,255,0.1)]">
                   {(lastPayment?.bill_amount || lastPayment?.initial_amount || 0).toFixed(2)}
                   <span className="text-6xl md:text-9xl opacity-20 ml-8 not-italic font-sans">₾</span>
@@ -135,7 +176,7 @@ function MonitorContent() {
       </main>
 
       <footer className="w-full max-w-5xl mx-auto mt-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-48 overflow-y-auto scrollbar-hide">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-48 overflow-y-auto scrollbar-hide pr-2">
           <AnimatePresence initial={false}>
             {history.map((tx) => (
               <motion.div key={tx.id} initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} className="bg-white/[0.03] border border-white/5 rounded-3xl p-6 flex justify-between items-center group hover:border-emerald-500/20 transition-all">
@@ -144,7 +185,6 @@ function MonitorContent() {
                   <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">REF_{tx.id.slice(0,6).toUpperCase()}</span>
                 </div>
                 <div className="text-right">
-                  {/* 🚀 აქაც bill_amount */}
                   <span className="text-4xl font-black italic text-white leading-none block">{(tx.bill_amount || tx.initial_amount || 0).toFixed(2)} ₾</span>
                   <span className="text-[10px] font-black text-emerald-500/50 uppercase tracking-widest mt-2 block">PAID: {tx.final_amount.toFixed(2)} ₾</span>
                 </div>

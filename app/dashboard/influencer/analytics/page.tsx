@@ -27,7 +27,7 @@ export default function AnalyticsPage() {
         .from('transactions')
         .select('*')
         .eq('influencer_id', user.id)
-        .eq('status', 'success')
+        .eq('status', 'approved') // 🎯 გასწორდა
         .order('created_at', { ascending: true })
 
       if (error) throw error
@@ -48,7 +48,6 @@ export default function AnalyticsPage() {
           const date = new Date(tx.created_at)
           const monthStr = monthNames[date.getMonth()]
           
-          // 🚀 შესწორებული: ვიღებთ მხოლოდ ინფლუენსერის წილს
           const amount = Number(tx.influencer_earned) || 0
           const ownerId = tx.token_id || 'unknown'
 
@@ -75,7 +74,6 @@ export default function AnalyticsPage() {
           const bId = tx.brand_id || 'unknown'
           if (!brandStats[bId]) brandStats[bId] = { scans: 0, revenue: 0 }
           brandStats[bId].scans += 1
-          // 🚀 შესწორებული: ბრენდების მიხედვითაც მხოლოდ თქვენს წილს ვითვლით
           brandStats[bId].revenue += Number(tx.influencer_earned) || 0
         })
 

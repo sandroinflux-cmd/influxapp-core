@@ -36,7 +36,7 @@ export default function MatrixDashboard() {
       .from('transactions')
       .select('*')
       .eq('influencer_id', user.id)
-      .eq('status', 'success')
+      .eq('status', 'approved') // 🎯 გასწორდა
       .order('created_at', { ascending: false })
 
     if (txData) {
@@ -49,7 +49,8 @@ export default function MatrixDashboard() {
   const subscribeToTransactions = () => {
     const channel = supabase
       .channel('realtime_vault')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions' }, () => {
+      // 🎯 გასწორდა: ახლა უსმენს UPDATE-ს, როცა ბანკი სტატუსს approved-ზე ცვლის
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transactions' }, () => {
         fetchMetrics()
       })
       .subscribe()
