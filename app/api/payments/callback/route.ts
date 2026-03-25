@@ -3,33 +3,35 @@ import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
   try {
-    // 1. უფრო უსაფრთხო წაკითხვა (JSON-ის ერორების თავიდან ასარიდებლად)
     const text = await request.text()
-    const body = text ? JSON.parse(text) : {}
+    const payload = text ? JSON.parse(text) : {}
     
-    console.log("💳 BOG Callback Full Body:", JSON.stringify(body, null, 2))
+    console.log("💳 BOG Callback Received:", JSON.stringify(payload, null, 2))
 
-    const bogStatus = body.status 
-    const txId = body.external_order_id || body.order_id // pro-tip: ბანკი ზოგჯერ order_id-ს აგზავნის
+    // 🚀 მთავარი მაგია: საქართველოს ბანკი მონაცემებს აგზავნის "body" ობიექტში!
+    const eventData = payload.body || payload; 
+
+    const bogStatus = eventData.status 
+    // ვიჭერთ ჩვენს ID-ს, სადაც არ უნდა გამოაგზავნოს ბანკმა
+    const txId = eventData.external_order_id || eventData.order_id || eventData.shop_order_id
 
     if (!txId) {
       console.error("❌ Callback Error: Missing transaction ID in payload")
       return NextResponse.json({ error: "Missing transaction ID" }, { status: 400 })
     }
 
-    // 2. ვამოწმებთ, საერთოდ გვაქვს თუ არა Service Key Vercel-ში!
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       console.error("🚨 CRITICAL ERROR: SUPABASE_SERVICE_ROLE_KEY is missing in Vercel Environment Variables!")
       return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 })
     }
 
-    // 🛡️ 3. ვქმნით სუპერ-ადმინის კლიენტს 
+    // 🛡️ ვქმნით სუპერ-ადმინის კლიენტს 
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY! 
     )
 
-    // 4. ახალი სტატუსის გარკვევა
+    // ახალი სტატუსის გარკვევა
     let newStatus = 'pending'
     if (bogStatus === 'success' || bogStatus === 'APPROVED' || bogStatus === 'IN_PROGRESS') {
       newStatus = 'approved'
@@ -39,7 +41,7 @@ export async function POST(request: Request) {
 
     console.log(`🔄 Attempting to update TX: ${txId} to status: ${newStatus}`)
 
-    // 5. ვანახლებთ სტატუსს Supabase-ში და ვითხოვთ პასუხის დაბრუნებას (.select())
+    // ვანახლებთ სტატუსს Supabase-ში
     const { data, error: updateError } = await supabaseAdmin
       .from('transactions')
       .update({ status: newStatus })
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
       console.log("✅ DB Update Success! Transaction Approved.")
     }
 
-    // 6. ბანკს ვუბრუნებთ 200 OK-ს
+    // ბანკს ვუბრუნებთ 200 OK-ს
     return NextResponse.json({ message: "Callback processed successfully" }, { status: 200 })
 
   } catch (error: any) {
