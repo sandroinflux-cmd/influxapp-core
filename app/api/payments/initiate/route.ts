@@ -34,9 +34,11 @@ async function getBogToken() {
 
 // 📦 2. ფუნქცია: BOG Order-ის (შეკვეთის) შექმნა
 async function createBogOrder(token: string, txId: string, amount: number) {
-  // ლოკალურისთვის localhost, ლაივისთვის თქვენი დომენი
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
   
+  // 🚨 BOG ითხოვს, რომ თანხა იყოს სუფთა რიცხვი (Number)
+  const finalPayable = Number(amount.toFixed(2));
+
   const response = await fetch('https://api.bog.ge/payments/v1/ecommerce/orders', {
     method: 'POST',
     headers: {
@@ -45,25 +47,29 @@ async function createBogOrder(token: string, txId: string, amount: number) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      callback_url: `${siteUrl}/api/payments/callback`, // 👈 ბანკი აქ გამოაგზავნის სტატუსს
-      external_order_id: txId, // ჩვენი ბაზის ტრანზაქციის ID (რომ ვაკონტროლოთ)
-      // 🚨 გასწორდა: ბანკი ითხოვს Array-ს (კვადრატულ ფრჩხილებს)
-      purchase_units: [
-        {
-          currency: 'GEL',
-          // 🚨 გასწორდა: ბანკი ითხოვს ზუსტად 2 ათწილადს (მაგ: "1.00")
-          total_amount: amount.toFixed(2) 
-        }
-      ],
+      callback_url: `${siteUrl}/api/payments/callback`, 
+      external_order_id: txId, 
+      // 🚨 BOG მკაცრი მოთხოვნა: Object ფორმატი და სავალდებულო კალათა (basket)
+      purchase_units: {
+        currency: 'GEL',
+        total_amount: finalPayable,
+        basket: [
+          {
+            product_id: "INFLUX-QR",
+            description: "INFLUX Partner Payment",
+            quantity: 1,
+            unit_price: finalPayable
+          }
+        ]
+      },
       redirect_urls: {
-        success: `${siteUrl}/payment/success?txid=${txId}`, // 👈 ფულის ჩამოჭრის მერე სად დაბრუნდეს
+        success: `${siteUrl}/payment/success?txid=${txId}`, 
         fail: `${siteUrl}/payment/fail?txid=${txId}`
       }
     })
   })
 
   if (!response.ok) {
-    // 🔍 თუ ერორია, დეტალურად ვლოგავთ, რომ გავიგოთ ზუსტად რა არ მოეწონა ბანკს
     const errorData = await response.json().catch(() => ({}))
     console.error("BOG Order Creation Error Details:", JSON.stringify(errorData, null, 2))
     throw new Error(`BOG Rejected: ${errorData?.error_message || errorData?.message || 'Check Vercel Logs'}`)
