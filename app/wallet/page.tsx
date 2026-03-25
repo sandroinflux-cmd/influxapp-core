@@ -39,7 +39,9 @@ export default function UnifiedWallet() {
             const { data: prof } = await supabase.from('profiles').select('id, full_name, avatar_url').eq('id', infId).single()
             const { data: dealsData } = await supabase.from('partnerships').select('*, deals(*)').eq('influencer_id', infId).eq('is_pushed_to_token', true)
             
-            let freshLiveDeals = []
+            // 🚀 გასწორდა: დაემატა : any[]
+            let freshLiveDeals: any[] = []
+            
             if (dealsData) {
               freshLiveDeals = dealsData.map((d: any, i: number) => ({
                 id: d.id || i,
@@ -132,13 +134,12 @@ export default function UnifiedWallet() {
               <div className="h-2 w-2 bg-red-600 rounded-full animate-pulse shadow-[0_0_15px_#dc2626]" />
             </div>
             <p className="text-[14px] md:text-base text-white font-bold uppercase tracking-[0.15em] italic leading-relaxed">
-              ZERO TOKENS FOUND. EITHER YOU&apos;RE LAGGING BEHIND, OR YOUR FAVORITE CREATOR HASN&apos;T CREATED YET.
+              ZERO TOKENS FOUND. EITHER YOU'RE LAGGING BEHIND, OR YOUR FAVORITE CREATOR HASN'T CREATED YET.
             </p>
           </motion.div>
         ) : (
           tokens.map((token, idx) => (
             <div key={idx} className="relative w-full max-w-[340px] mx-auto flex flex-col items-center group">
-              {/* აქ disableRotation={false} გავხადე, რომ ისევე ტრიალებდეს და ცოცხალი იყოს, როგორც ინფლუენსერთან! */}
               <InfluXCard profile={token.profile} liveDeals={token.liveDeals} disableRotation={false}>
                 <button 
                   onClick={(e) => handleScanToPay(e, token)}
