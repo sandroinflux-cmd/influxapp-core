@@ -3,51 +3,65 @@ import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
   try {
-    // 1. ვიჭერთ ბანკის გამოგზავნილ ინფორმაციას
-    const body = await request.json()
-    console.log("BOG Callback Received:", body) // ეს Vercel-ის ლოგებში გამოჩნდება
+    // 1. უფრო უსაფრთხო წაკითხვა (JSON-ის ერორების თავიდან ასარიდებლად)
+    const text = await request.text()
+    const body = text ? JSON.parse(text) : {}
+    
+    console.log("💳 BOG Callback Full Body:", JSON.stringify(body, null, 2))
 
-    // BOG სტანდარტულად გვიბრუნებს სტატუსს და ჩვენსავე გაგზავნილ external_order_id-ს
     const bogStatus = body.status 
-    const txId = body.external_order_id
+    const txId = body.external_order_id || body.order_id // pro-tip: ბანკი ზოგჯერ order_id-ს აგზავნის
 
     if (!txId) {
-      console.error("Callback Invalid: Missing transaction ID")
+      console.error("❌ Callback Error: Missing transaction ID in payload")
       return NextResponse.json({ error: "Missing transaction ID" }, { status: 400 })
     }
 
-    // 🛡️ 2. ვქმნით სუპერ-ადმინის კლიენტს ბაზის გასაახლებლად
-    // აუცილებელია SERVICE_ROLE_KEY, რადგან Webhook-ს არ აქვს User Session
+    // 2. ვამოწმებთ, საერთოდ გვაქვს თუ არა Service Key Vercel-ში!
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("🚨 CRITICAL ERROR: SUPABASE_SERVICE_ROLE_KEY is missing in Vercel Environment Variables!")
+      return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 })
+    }
+
+    // 🛡️ 3. ვქმნით სუპერ-ადმინის კლიენტს 
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY! 
     )
 
-    // 3. განვსაზღვროთ ტრანზაქციის ახალი სტატუსი
+    // 4. ახალი სტატუსის გარკვევა
     let newStatus = 'pending'
-    if (bogStatus === 'success' || bogStatus === 'APPROVED') {
+    if (bogStatus === 'success' || bogStatus === 'APPROVED' || bogStatus === 'IN_PROGRESS') {
       newStatus = 'approved'
-    } else if (bogStatus === 'error' || bogStatus === 'REJECTED' || bogStatus === 'failed') {
+    } else if (bogStatus === 'error' || bogStatus === 'REJECTED' || bogStatus === 'fail' || bogStatus === 'failed') {
       newStatus = 'rejected'
     }
 
-    // 4. ვანახლებთ სტატუსს Supabase-ში
-    const { error: updateError } = await supabaseAdmin
+    console.log(`🔄 Attempting to update TX: ${txId} to status: ${newStatus}`)
+
+    // 5. ვანახლებთ სტატუსს Supabase-ში და ვითხოვთ პასუხის დაბრუნებას (.select())
+    const { data, error: updateError } = await supabaseAdmin
       .from('transactions')
       .update({ status: newStatus })
       .eq('id', txId)
+      .select()
 
     if (updateError) {
-      console.error("Supabase Update Error in Callback:", updateError.message)
+      console.error("❌ Supabase Update Error:", updateError.message)
       throw updateError
     }
 
-    // 5. ბანკს ვუბრუნებთ 200 OK-ს, რომ სიგნალი მივიღეთ
+    if (!data || data.length === 0) {
+      console.error("⚠️ Warning: Update ran, but no transaction was found with ID:", txId)
+    } else {
+      console.log("✅ DB Update Success! Transaction Approved.")
+    }
+
+    // 6. ბანკს ვუბრუნებთ 200 OK-ს
     return NextResponse.json({ message: "Callback processed successfully" }, { status: 200 })
 
   } catch (error: any) {
-    console.error("Critical BOG Callback Error:", error.message)
-    // 500 სტატუსს ვაბრუნებთ, რომ ბანკმა იცოდეს ჩვენთან რაღაც აირია
+    console.error("❌ Critical Webhook Error:", error.message)
     return NextResponse.json({ error: "Server Error" }, { status: 500 })
   }
 }
