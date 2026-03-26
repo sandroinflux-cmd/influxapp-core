@@ -39,7 +39,7 @@ function PaymentContent() {
         const token = JSON.parse(activeTokenRaw);
         const influencerId = token.profile?.id || token.id;
 
-        // 🔍 პარტნიორობის ამოღება
+        // 🔍 პარტნიორობის ამოღება (deals ცხრილთან ერთად)
         const { data: p, error } = await supabase
           .from('partnerships')
           .select('*, deals(*)')
@@ -47,21 +47,14 @@ function PaymentContent() {
           .eq('brand_id', brandId)
           .single();
 
-        // 🚀 ბრენდის ლოგოს და სახელის 100% ზუსტი ამოღება
-        let brandData = null;
-        if (brandId) {
-          const { data: b } = await supabase.from('brands').select('*').eq('id', brandId).single();
-          brandData = b;
-        }
-
         if (!p || error) {
           setStep('no-partnership');
         } else {
+          // 🚀 ვიღებთ პირდაპირ deals ცხრილიდან!
           setActiveDeal({
             ...p,
-            brand: brandData?.name || p.deals?.title || 'MATRIX PARTNER',
-            logo: brandData?.logo || p.deals?.logo || '💎',
-            brands: brandData // ვინახავთ ორივე ფორმატს დაზღვევისთვის
+            brand: p.deals?.title || 'MATRIX PARTNER',
+            logo: p.deals?.logo || '💎'
           });
           setStep('amount');
         }

@@ -36,15 +36,9 @@ function SuccessContent() {
       if (txError) throw txError
       if (!tx) throw new Error("Transaction not found")
 
-      // 🚀 ბრენდის ამოღება პირდაპირ transaction-დან (დაზღვეული მეთოდი)
-      let brandData = null;
-      if (tx.brand_id) {
-         const { data: b } = await supabase.from('brands').select('*').eq('id', tx.brand_id).single();
-         brandData = b;
-      }
-
       let dealData = null
       if (tx.deal_id) {
+        // 🚀 ვიღებთ პირდაპირ deals ცხრილს
         const { data: d } = await supabase.from('deals').select('*').eq('id', tx.deal_id).single()
         dealData = d
       }
@@ -52,9 +46,8 @@ function SuccessContent() {
       // 🚀 ვაერთიანებთ, რომ ქვითარმა ზუსტი სახელი დაინახოს
       const mergedDeal = {
         ...dealData,
-        brand: brandData?.name || 'MATRIX PARTNER',
-        logo: brandData?.logo || '💎',
-        brands: brandData
+        brand: dealData?.title || 'MATRIX PARTNER',
+        logo: dealData?.logo || '💎'
       };
 
       setTxData({ ...tx, deals: mergedDeal })
@@ -63,7 +56,7 @@ function SuccessContent() {
       if (!savedHistory.find((t: any) => t.id === tx.id)) {
         savedHistory.unshift({
           id: tx.id,
-          brandName: brandData?.name || 'Matrix Partner',
+          brandName: dealData?.title || 'Matrix Partner',
           date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           paid: tx.final_amount,
           saved: tx.bill_amount - tx.final_amount
