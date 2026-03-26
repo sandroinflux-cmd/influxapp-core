@@ -7,7 +7,6 @@ import dynamic from 'next/dynamic'
 import AmountModal from '@/components/AmountModal'
 import { motion } from 'framer-motion'
 
-// 📸 Dynamic Scanner Loading
 const QRScanner = dynamic(() => import('@/components/QRScanner'), { 
   ssr: false,
   loading: () => (
@@ -20,13 +19,11 @@ const QRScanner = dynamic(() => import('@/components/QRScanner'), {
 
 function PaymentContent() {
   const router = useRouter()
-  // Added 'no-partnership' step
   const [step, setStep] = useState<'scan' | 'amount' | 'no-partnership'>('scan')
   const [scannedBrand, setScannedBrand] = useState<string | null>(null)
   const [activeDeal, setActiveDeal] = useState<any>(null)
   const [loading, setLoading] = useState(false)
 
-  // 📸 QR Scanning Logic
   const handleScanSuccess = async (decodedText: string) => {
     try {
       setLoading(true)
@@ -42,7 +39,7 @@ function PaymentContent() {
         const token = JSON.parse(activeTokenRaw);
         const influencerId = token.profile?.id || token.id;
 
-        // 🔍 Checking Partnership
+        // 🔍 პარტნიორობის ამოღება
         const { data: p, error } = await supabase
           .from('partnerships')
           .select('*, deals(*)')
@@ -50,16 +47,25 @@ function PaymentContent() {
           .eq('brand_id', brandId)
           .single();
 
+        // 🚀 ბრენდის ლოგოს და სახელის 100% ზუსტი ამოღება
+        let brandData = null;
+        if (brandId) {
+          const { data: b } = await supabase.from('brands').select('*').eq('id', brandId).single();
+          brandData = b;
+        }
+
         if (!p || error) {
-          // ❌ Partnership not found
           setStep('no-partnership');
         } else {
-          // ✅ Partnership exists
-          setActiveDeal(p);
+          setActiveDeal({
+            ...p,
+            brand: brandData?.name || p.deals?.title || 'MATRIX PARTNER',
+            logo: brandData?.logo || p.deals?.logo || '💎',
+            brands: brandData // ვინახავთ ორივე ფორმატს დაზღვევისთვის
+          });
           setStep('amount');
         }
       } else {
-        // If no token is selected at all
         setStep('no-partnership');
       }
     } catch (err) { 
@@ -69,7 +75,6 @@ function PaymentContent() {
     }
   }
 
-  // 💸 Payment Initiation (for bank integration)
   const handlePaymentConfirm = async (finalPayable: number) => {
     setLoading(true)
     try {
@@ -98,7 +103,6 @@ function PaymentContent() {
 
       const data = await response.json()
       if (data.checkoutUrl) {
-        // Redirecting to bank page here
         router.push(data.checkoutUrl)
       } else {
         throw new Error(data.error)
@@ -119,8 +123,6 @@ function PaymentContent() {
 
   return (
     <div className="w-full max-w-md mx-auto relative z-10">
-      
-      {/* 1. Scanning Step */}
       {step === 'scan' && (
         <div className="space-y-10 animate-in fade-in zoom-in duration-700">
           <div className="text-center space-y-3">
@@ -132,7 +134,6 @@ function PaymentContent() {
         </div>
       )}
 
-      {/* 2. Error Step (when no partnership exists) */}
       {step === 'no-partnership' && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.9 }}
@@ -142,7 +143,6 @@ function PaymentContent() {
           <div className="h-16 w-16 rounded-full border-2 border-red-500/30 flex items-center justify-center">
             <span className="text-red-500 text-3xl font-mono">!</span>
           </div>
-          
           <div className="space-y-2">
             <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter">Access Denied</h2>
             <p className="text-sm text-gray-400 font-bold uppercase tracking-widest italic leading-relaxed">
@@ -150,7 +150,6 @@ function PaymentContent() {
                This offer is not linked to your Node.
             </p>
           </div>
-
           <button 
             onClick={() => { localStorage.removeItem('matrix_active_token'); router.push('/wallet') }}
             className="w-full py-4 bg-red-600/10 border border-red-500/50 text-red-500 rounded-full font-black text-[10px] uppercase tracking-[0.4em] italic hover:bg-red-600 hover:text-white transition-all active:scale-95"
@@ -160,7 +159,6 @@ function PaymentContent() {
         </motion.div>
       )}
 
-      {/* 3. Payment Step (only if partnership exists) */}
       {step === 'amount' && (
         <AmountModal 
           deal={activeDeal} 

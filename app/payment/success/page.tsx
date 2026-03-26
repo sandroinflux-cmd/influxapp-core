@@ -27,7 +27,6 @@ function SuccessContent() {
     try {
       setLoading(true)
 
-      // 🛡️ 1. ჯერ ამოგვაქვს მხოლოდ ტრანზაქცია (ბაზის ერორის ასარიდებლად)
       const { data: tx, error: txError } = await supabase
         .from('transactions')
         .select('*')
@@ -37,33 +36,39 @@ function SuccessContent() {
       if (txError) throw txError
       if (!tx) throw new Error("Transaction not found")
 
-      // 🛡️ 2. თუ ტრანზაქციას აქვს deal_id, ცალკე ამოგვაქვს Deal და მისი Brand (ჩეკისთვის)
+      // 🚀 ბრენდის ამოღება პირდაპირ transaction-დან (დაზღვეული მეთოდი)
+      let brandData = null;
+      if (tx.brand_id) {
+         const { data: b } = await supabase.from('brands').select('*').eq('id', tx.brand_id).single();
+         brandData = b;
+      }
+
       let dealData = null
       if (tx.deal_id) {
-        // აქ ბრენდსაც ვაყოლებთ, რომ ჩეკზე კომპანიის სახელი ლამაზად დაიწეროს
-        const { data: d } = await supabase
-          .from('deals')
-          .select('*, brands(*)')
-          .eq('id', tx.deal_id)
-          .single()
+        const { data: d } = await supabase.from('deals').select('*').eq('id', tx.deal_id).single()
         dealData = d
       }
 
-      // 🛡️ 3. ვაერთიანებთ მონაცემებს და ვაწვდით ჩეკს!
-      setTxData({ ...tx, deals: dealData })
+      // 🚀 ვაერთიანებთ, რომ ქვითარმა ზუსტი სახელი დაინახოს
+      const mergedDeal = {
+        ...dealData,
+        brand: brandData?.name || 'MATRIX PARTNER',
+        logo: brandData?.logo || '💎',
+        brands: brandData
+      };
 
-      // 🚀 4. ვინახავთ მომხმარებლის ტელეფონში (ვოლეტის ისტორიისთვის)
+      setTxData({ ...tx, deals: mergedDeal })
+
       const savedHistory = JSON.parse(localStorage.getItem('matrix_user_transactions') || '[]')
-      // ვამოწმებთ, უკვე ხომ არ არის შენახული ეს ჩეკი (რეფრეშის დროს რომ არ გაორმაგდეს)
       if (!savedHistory.find((t: any) => t.id === tx.id)) {
         savedHistory.unshift({
           id: tx.id,
-          brandName: dealData?.brands?.name || 'Matrix Partner',
+          brandName: brandData?.name || 'Matrix Partner',
           date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           paid: tx.final_amount,
           saved: tx.bill_amount - tx.final_amount
         })
-        localStorage.setItem('matrix_user_transactions', JSON.stringify(savedHistory.slice(0, 15))) // ვინახავთ მხოლოდ ბოლო 15-ს
+        localStorage.setItem('matrix_user_transactions', JSON.stringify(savedHistory.slice(0, 15))) 
       }
 
     } catch (err: any) {
