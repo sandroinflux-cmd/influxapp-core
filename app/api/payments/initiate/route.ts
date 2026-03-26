@@ -32,12 +32,41 @@ async function getBogToken() {
   return data.access_token
 }
 
-// 📦 2. ფუნქცია: BOG Order-ის (შეკვეთის) შექმნა
-async function createBogOrder(token: string, txId: string, amount: number) {
+// 📦 2. ფუნქცია: BOG Order-ის შექმნა (დამატებულია Split ლოგიკა!)
+async function createBogOrder(token: string, txId: string, amount: number, splits: any[]) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
-  
-  // 🚨 BOG ითხოვს, რომ თანხა იყოს სუფთა რიცხვი (Number)
   const finalPayable = Number(amount.toFixed(2));
+
+  // ძირითადი შეკვეთის სტრუქტურა
+  const requestBody: any = {
+    callback_url: `${siteUrl}/api/payments/callback`, 
+    external_order_id: txId, 
+    purchase_units: {
+      currency: 'GEL',
+      total_amount: finalPayable,
+      basket: [
+        {
+          product_id: "INFLUX-QR",
+          description: "INFLUX Payment", // შემოკლებული აღწერა
+          quantity: 1,
+          unit_price: finalPayable
+        }
+      ]
+    },
+    redirect_urls: {
+      success: `${siteUrl}/payment/success?txid=${txId}`, 
+      fail: `${siteUrl}/payment/fail?txid=${txId}`
+    }
+  };
+
+  // 🚀 თუ IBAN-ები მოიძებნა, ვამატებთ Split-ს
+  if (splits && splits.length > 0) {
+    requestBody.config = {
+      split: {
+        split_payments: splits
+      }
+    };
+  }
 
   const response = await fetch('https://api.bog.ge/payments/v1/ecommerce/orders', {
     method: 'POST',
@@ -46,32 +75,12 @@ async function createBogOrder(token: string, txId: string, amount: number) {
       'Accept-Language': 'ka',
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      callback_url: `${siteUrl}/api/payments/callback`, 
-      external_order_id: txId, 
-      // 🚨 BOG მკაცრი მოთხოვნა: Object ფორმატი და სავალდებულო კალათა (basket)
-      purchase_units: {
-        currency: 'GEL',
-        total_amount: finalPayable,
-        basket: [
-          {
-            product_id: "INFLUX-QR",
-            description: "INFLUX Partner Payment",
-            quantity: 1,
-            unit_price: finalPayable
-          }
-        ]
-      },
-      redirect_urls: {
-        success: `${siteUrl}/payment/success?txid=${txId}`, 
-        fail: `${siteUrl}/payment/fail?txid=${txId}`
-      }
-    })
+    body: JSON.stringify(requestBody)
   })
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
-    console.error("BOG Order Creation Error Details:", JSON.stringify(errorData, null, 2))
+    console.error("❌ BOG Order Creation Error:", JSON.stringify(errorData, null, 2))
     throw new Error(`BOG Rejected: ${errorData?.error_message || errorData?.message || 'Check Vercel Logs'}`)
   }
 
@@ -100,17 +109,39 @@ export async function POST(request: Request) {
       { cookies: { getAll() { return cookieStore.getAll() } } }
     )
 
-    // 🚀 ამოგვაქვს IBAN-ები
+    // 🚀 1. ამოგვაქვს IBAN-ები Profiles ცხრილიდან
     const { data: brandProf } = await supabase.from('profiles').select('iban').eq('id', brandId).single()
     const { data: influProf } = await supabase.from('profiles').select('iban').eq('id', influencerId).single()
 
-    // 🛡️ ვქმნით ტრანზაქციას ჩვენს ბაზაში (Pending)
+    const brandIban = brandProf?.iban?.trim();
+    const influencerIban = influProf?.iban?.trim();
+
+    // 🛡️ 2. ვამზადებთ Split მასივს ბანკისთვის (მხოლოდ ვალიდური თანხებისთვის და IBAN-ებისთვის)
+    const splitPayments = [];
+    
+    if (brandIban && brandEarned > 0) {
+      splitPayments.push({
+        amount: Number(brandEarned.toFixed(2)),
+        iban: brandIban,
+        description: "InfluX Brand Payout" // BOG წესი: მაქს 25 სიმბოლო
+      });
+    }
+
+    if (influencerIban && influencerEarned > 0) {
+      splitPayments.push({
+        amount: Number(influencerEarned.toFixed(2)),
+        iban: influencerIban,
+        description: "InfluX Partner Payout" // BOG წესი: მაქს 25 სიმბოლო
+      });
+    }
+
+    // 🛡️ 3. ვქმნით ტრანზაქციას ჩვენს ბაზაში (Pending)
     const { data: tx, error: txError } = await supabase
       .from('transactions')
       .insert([{
         bill_amount: amount,
         final_amount: finalAmount,
-        amount: amount, // 🎯 გასწორდა: აქ ვინახავთ ორიგინალ თანხას (Bill Amount) ტრიგერის ერორის ასარიდებლად!
+        amount: amount, 
         brand_id: brandId,
         influencer_id: influencerId,
         deal_id: dealId,
@@ -118,24 +149,23 @@ export async function POST(request: Request) {
         commission_percent: commissionPercent,
         brand_earned: brandEarned,
         influencer_earned: influencerEarned,
-        brand_iban: brandProf?.iban || '',
-        influencer_iban: influProf?.iban || '',
+        brand_iban: brandIban || '',
+        influencer_iban: influencerIban || '',
         status: 'pending',
-        system_fee: 0
+        system_fee: finalAmount - brandEarned - influencerEarned // პლატფორმის საკომისიო
       }])
       .select()
       .single()
 
     if (txError) throw txError
 
-    // 🏦 ბანკის API-სთან დაკავშირება
+    // 🏦 4. ბანკის API-სთან დაკავშირება და შეკვეთის შექმნა
     const bogToken = await getBogToken()
-    // 🎯 ყურადღება: ბანკს ვუგზავნით finalAmount-ს, ამიტომ ბანკი ისევ 0.80 ლარს ჩამოჭრის!
-    const bogOrder = await createBogOrder(bogToken, tx.id, finalAmount)
+    
+    // გადავცემთ splitPayments მასივს
+    const bogOrder = await createBogOrder(bogToken, tx.id, finalAmount, splitPayments)
 
-    // ვპოულობთ სარეკირექტო ლინკს ბანკის პასუხიდან
     const bankCheckoutUrl = bogOrder._links.redirect.href
-
     return NextResponse.json({ checkoutUrl: bankCheckoutUrl })
 
   } catch (error: any) {

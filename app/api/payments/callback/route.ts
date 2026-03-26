@@ -10,9 +10,16 @@ export async function POST(request: Request) {
 
     const eventData = payload.body || payload; 
 
-    // 🚀 ფიქსი: საქართველოს ბანკი სტატუსს აგზავნის order_status.key-ში და არის "completed"
     const bogStatus = eventData.order_status?.key || eventData.status;
     const txId = eventData.external_order_id || eventData.order_id || eventData.shop_order_id
+
+    // 🚀 ვაანალიზებთ Split ობიექტს
+    if (eventData.split) {
+      console.log(`🔀 Split Status: ${eventData.split.split_status}`);
+      if (eventData.split.split_reject_reason) {
+        console.error(`⚠️ BOG Split Rejected: ${eventData.split.split_reject_reason}`);
+      }
+    }
 
     if (!txId) {
       console.error("❌ Callback Error: Missing transaction ID in payload")
@@ -29,7 +36,6 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY! 
     )
 
-    // 🚀 სტატუსის გარკვევა (გავითვალისწინეთ "completed")
     let newStatus = 'pending'
     const normalizedStatus = bogStatus?.toLowerCase() || '';
 
@@ -39,7 +45,7 @@ export async function POST(request: Request) {
       newStatus = 'rejected'
     }
 
-    console.log(`🔄 Attempting to update TX: ${txId} from BOG status '${bogStatus}' to our DB status '${newStatus}'`)
+    console.log(`🔄 Updating TX: ${txId} to status: '${newStatus}'`)
 
     const { data, error: updateError } = await supabaseAdmin
       .from('transactions')
