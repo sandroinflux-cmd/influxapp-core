@@ -7,7 +7,6 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
   const [time, setTime] = useState(new Date())
   const [hash, setHash] = useState('')
   const [influencer, setInfluencer] = useState<any>(null)
-  const [isDownloading, setIsDownloading] = useState(false)
   
   const savings = (originalAmount || 0) - total;
   
@@ -23,62 +22,37 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
     return () => clearInterval(timer)
   }, [])
 
-  // 🚀 100% ზუსტი და გაუჭრელი PDF გენერატორი (Custom Dimension)
+  // 🚀 ბრაუზერის ჩაშენებული, 100%-ით სტაბილური ფუნქცია
   const handlePrint = () => {
-    setIsDownloading(true);
-    const element = document.getElementById('receipt-wrapper');
-    if (!element) {
-        setIsDownloading(false);
-        return;
-    }
-
-    const generatePDF = () => {
-      // @ts-ignore
-      window.html2canvas(element, { scale: 3, useCORS: true, backgroundColor: '#020402' }).then((canvas) => {
-        const imgData = canvas.toDataURL('image/jpeg', 1.0);
-        const pdfWidth = element.offsetWidth;
-        const pdfHeight = element.offsetHeight;
-        
-        // 🚀 ზუსტად ქვითრის სიმაღლის და სიგანის PDF იქმნება ფურცლის გაჭრის გარეშე!
-        // @ts-ignore
-        const pdf = new window.jspdf.jsPDF({
-          orientation: 'portrait',
-          unit: 'px',
-          format: [pdfWidth, pdfHeight]
-        });
-        
-        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save(`INFLUX_${brandName}_${hash}.pdf`);
-        setIsDownloading(false);
-      }).catch((err: any) => {
-        console.error("PDF Error:", err);
-        setIsDownloading(false);
-      });
-    };
-
-    // ვტვირთავთ ბიბლიოთეკებს პირდაპირ, რომ არ გაიჭედოს
-    // @ts-ignore
-    if (window.html2canvas && window.jspdf) {
-      generatePDF();
-    } else {
-      const script1 = document.createElement('script');
-      script1.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-      document.body.appendChild(script1);
-
-      const script2 = document.createElement('script');
-      script2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      document.body.appendChild(script2);
-
-      script2.onload = () => {
-        setTimeout(generatePDF, 600); // ვაცდით ჩატვირთვას
-      };
-    }
+    window.print();
   };
 
   return (
     <div className="fixed inset-0 z-[300] bg-black/98 backdrop-blur-3xl flex flex-col items-center justify-center p-4 overflow-hidden font-sans">
       
-      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+      {/* 🚀 ბეჭდვის სტილები: დამალავს ყველაფერს ქვითრის გარდა! */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          body * { visibility: hidden; }
+          #receipt-wrapper, #receipt-wrapper * { visibility: visible; }
+          #receipt-wrapper {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 400px;
+            border: none !important;
+            box-shadow: none !important;
+            background: #020402 !important;
+            margin: 0;
+            padding: 20px;
+          }
+          .print-hide { display: none !important; }
+        }
+      `}} />
+
+      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20 print-hide">
         {[...Array(2)].map((_, i) => (
           <motion.div
             key={i}
@@ -122,9 +96,9 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
           </div>
           
           <div className="h-12 w-12 rounded-xl bg-black border border-emerald-500/30 flex items-center justify-center relative overflow-hidden shadow-inner shrink-0">
-             <motion.div animate={{ top: ["-100%", "200%"] }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }} className="absolute w-full h-[1px] bg-emerald-400 shadow-[0_0_15px_#10b981] z-20" />
+             <motion.div animate={{ top: ["-100%", "200%"] }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }} className="absolute w-full h-[1px] bg-emerald-400 shadow-[0_0_15px_#10b981] z-20 print-hide" />
              {influencer?.avatar_url 
-               ? <img src={influencer.avatar_url} className="w-full h-full object-cover filter brightness-110" crossOrigin="anonymous" /> 
+               ? <img src={influencer.avatar_url} className="w-full h-full object-cover filter brightness-110" /> 
                : <span className="text-xl">🤖</span>}
           </div>
         </div>
@@ -138,7 +112,7 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
               </h3>
             </div>
 
-            <div className="relative h-20 w-20 flex items-center justify-center mr-1 overflow-hidden scale-110">
+            <div className="relative h-20 w-20 flex items-center justify-center mr-1 overflow-hidden scale-110 print-hide">
               <motion.div 
                 animate={{ rotateY: 360, rotateX: 360, rotateZ: 360 }} 
                 transition={{ duration: 6, repeat: Infinity, ease: "linear" }} 
@@ -199,13 +173,12 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
         </div>
       </motion.div>
 
-      <div className="w-full max-w-[340px] pt-6 flex flex-col gap-3 relative z-10">
+      <div className="w-full max-w-[340px] pt-6 flex flex-col gap-3 relative z-10 print-hide">
         <button 
           onClick={handlePrint} 
-          disabled={isDownloading}
-          className="w-full bg-white text-black py-4 rounded-[22px] font-black text-[10px] tracking-[0.4em] uppercase hover:bg-emerald-500 hover:text-white transition-all shadow-2xl active:scale-95 disabled:opacity-50"
+          className="w-full bg-white text-black py-4 rounded-[22px] font-black text-[10px] tracking-[0.4em] uppercase hover:bg-emerald-500 hover:text-white transition-all shadow-2xl active:scale-95"
         >
-          {isDownloading ? 'GENERATING PDF...' : 'DOWNLOAD'}
+          SAVE / DOWNLOAD PDF
         </button>
         <button onClick={onDone} className="w-full py-2 text-[7px] font-black text-gray-700 uppercase tracking-[0.3em] hover:text-white transition-colors italic">
           Dismiss Node
