@@ -13,7 +13,7 @@ export default function QRScanner({ onScanSuccess, onScanError }: QRScannerProps
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isProcessingFile, setIsProcessingFile] = useState(false)
-  const isScanningRef = useRef(false) // 🚀 იცავს ორმაგი დასკანერებისგან
+  const isScanningRef = useRef(false) 
 
   useEffect(() => {
     let isMounted = true;
@@ -28,16 +28,15 @@ export default function QRScanner({ onScanSuccess, onScanError }: QRScannerProps
             fps: 10, 
             qrbox: (viewfinderWidth, viewfinderHeight) => {
               const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-              const size = Math.floor(minEdge * 0.7); // 70% პროპორცია
+              const size = Math.floor(minEdge * 0.7); 
               return { width: size, height: size };
             },
             aspectRatio: 1.0 
           },
           (decodedText) => {
             if (isMounted && !isScanningRef.current) {
-              isScanningRef.current = true; // ვბლოკავთ, რომ ბევრჯერ არ გაეშვას
+              isScanningRef.current = true; 
               
-              // 🚀 კამერას "ვაპაუზებთ" და არა ვთიშავთ, რომ React-მა უსაფრთხოდ წაშალოს
               if (scannerRef.current?.getState() === 2) { 
                 scannerRef.current.pause(true);
               }
@@ -45,10 +44,10 @@ export default function QRScanner({ onScanSuccess, onScanError }: QRScannerProps
               onScanSuccess(decodedText)
             }
           },
-          (err) => {
+          (err: any) => {
             if (isMounted && onScanError && !isScanningRef.current) {
-              // ვაიგნორებთ ჩვეულებრივ ერორებს კონსოლის გადავსებისგან
-              if (!err?.message?.includes('NotFoundException')) {
+              // 🚀 ფიქსი: უსაფრთხოდ ვამოწმებთ ტექსტს (TypeScript ერორის გარეშე)
+              if (!String(err).includes('NotFoundException')) {
                  onScanError(err)
               }
             }
@@ -66,7 +65,7 @@ export default function QRScanner({ onScanSuccess, onScanError }: QRScannerProps
       if (scannerRef.current) {
         try {
            const state = scannerRef.current.getState();
-           if (state === 2 || state === 3) { // თუ მუშაობს ან დაპაუზებულია
+           if (state === 2 || state === 3) { 
              scannerRef.current.stop().then(() => {
                scannerRef.current?.clear();
              }).catch(() => {});
@@ -78,7 +77,6 @@ export default function QRScanner({ onScanSuccess, onScanError }: QRScannerProps
     }
   }, [onScanSuccess, onScanError])
 
-  // 📁 ფაილის ატვირთვა 100% უსაფრთხო jsQR მეთოდით
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -89,7 +87,6 @@ export default function QRScanner({ onScanSuccess, onScanError }: QRScannerProps
     reader.onload = (event) => {
       const img = new Image()
       img.onload = () => {
-        // 🚀 ვქმნით უხილავ ტილოს სურათის წასაკითხად
         const canvas = document.createElement('canvas')
         canvas.width = img.width
         canvas.height = img.height
