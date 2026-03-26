@@ -11,8 +11,8 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
   
   const savings = (originalAmount || 0) - total;
   
-  // 🚀 100%-ით ზუსტი ბრენდის სახელი (Wallet-ის ლოგიკიდან)
-  const brandName = deal?.brand || "GLOBAL PARTNER";
+  // 🚀 დაზღვეული სახელი აქაც!
+  const brandName = deal?.brands?.name || deal?.brand || deal?.title || "MATRIX PARTNER";
 
   useEffect(() => {
     setHash(Math.random().toString(36).substr(2, 10).toUpperCase())
@@ -24,26 +24,43 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
     return () => clearInterval(timer)
   }, [])
 
-  // 🚀 PDF გენერატორი გაუმჯობესებული ფორმატით (შუაზე აღარ გაჭრის!)
+  // 🚀 PDF გენერატორი დაცვითი მექანიზმით
   const handlePrint = () => {
     setIsDownloading(true)
     const element = document.getElementById('receipt-wrapper')
     
-    const script = document.createElement('script')
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
-    script.onload = () => {
+    const generatePDF = () => {
       const opt = {
         margin: 0,
         filename: `INFLUX_${brandName}_${hash}.pdf`,
-        image: { type: 'jpeg', quality: 1 },
-        // 🚀 [4.5, 7.5] არის მობილური ეკრანის პროპორცია, ამიტომ 1 გვერდზე დაეტევა იდეალურად!
-        html2canvas: { scale: 3, useCORS: true, backgroundColor: '#020402' },
-        jsPDF: { unit: 'in', format: [4.5, 7.5], orientation: 'portrait' } 
+        image: { type: 'jpeg', quality: 0.98 },
+        // სტანდარტული ზომა 'a5', რომ აღარ გაქრაშოს!
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#020402' },
+        jsPDF: { unit: 'mm', format: 'a5', orientation: 'portrait' }
       }
-      // @ts-ignore
-      window.html2pdf().set(opt).from(element).save().then(() => setIsDownloading(false))
+      try {
+        // @ts-ignore
+        window.html2pdf().set(opt).from(element).save().then(() => {
+          setIsDownloading(false);
+        }).catch((err: any) => {
+          console.error("PDF generation failed:", err);
+          setIsDownloading(false);
+        });
+      } catch (e) {
+        setIsDownloading(false);
+      }
+    };
+
+    // @ts-ignore
+    if (window.html2pdf) {
+      generatePDF();
+    } else {
+      const script = document.createElement('script')
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
+      script.onload = generatePDF;
+      script.onerror = () => setIsDownloading(false);
+      document.body.appendChild(script)
     }
-    document.body.appendChild(script)
   };
 
   return (
@@ -95,7 +112,7 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
           <div className="h-12 w-12 rounded-xl bg-black border border-emerald-500/30 flex items-center justify-center relative overflow-hidden shadow-inner shrink-0">
              <motion.div animate={{ top: ["-100%", "200%"] }} transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }} className="absolute w-full h-[1px] bg-emerald-400 shadow-[0_0_15px_#10b981] z-20" />
              {influencer?.avatar_url 
-               ? <img src={influencer.avatar_url} className="w-full h-full object-cover filter brightness-110" crossOrigin="anonymous" /> 
+               ? <img src={influencer.avatar_url} className="w-full h-full object-cover filter brightness-110" /> 
                : <span className="text-xl">🤖</span>}
           </div>
         </div>

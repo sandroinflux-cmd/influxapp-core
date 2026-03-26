@@ -26,11 +26,8 @@ export default function QRScanner({ onScanSuccess, onScanError }: QRScannerProps
           { facingMode: "environment" },
           { 
             fps: 10, 
-            qrbox: (viewfinderWidth, viewfinderHeight) => {
-              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-              const size = Math.floor(minEdge * 0.7); 
-              return { width: size, height: size };
-            },
+            // 🚀 დავაბრუნეთ სტანდარტული ზომა. დინამიურმა ზომამ გამოიწვია შავი ეკრანი.
+            qrbox: { width: 250, height: 250 },
             aspectRatio: 1.0 
           },
           (decodedText) => {
@@ -46,7 +43,6 @@ export default function QRScanner({ onScanSuccess, onScanError }: QRScannerProps
           },
           (err: any) => {
             if (isMounted && onScanError && !isScanningRef.current) {
-              // 🚀 ფიქსი: უსაფრთხოდ ვამოწმებთ ტექსტს (TypeScript ერორის გარეშე)
               if (!String(err).includes('NotFoundException')) {
                  onScanError(err)
               }
@@ -118,9 +114,8 @@ export default function QRScanner({ onScanSuccess, onScanError }: QRScannerProps
 
   return (
     <div className="w-full flex flex-col items-center relative z-10 space-y-6">
-      
       <div className="w-full max-w-sm overflow-hidden rounded-[30px] border-2 border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.15)] bg-black relative">
-        <div id="matrix-qr-reader" className="w-full h-[320px] object-cover [&>video]:object-cover"></div>
+        <div id="matrix-qr-reader" className="w-full min-h-[300px] object-cover bg-black flex items-center justify-center"></div>
         <div className="absolute top-1/2 left-0 w-full h-1 bg-emerald-500/80 animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_15px_#10b981] z-30 pointer-events-none" />
       </div>
       
