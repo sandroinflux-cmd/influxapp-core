@@ -5,7 +5,8 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  // თუ გინდა რომ ლოგინის მერე კონკრეტულ გვერდზე გადავიდეს
+  
+  // საით უნდა გავუშვათ იუზერი ლოგინის მერე
   const next = searchParams.get('next') ?? '/'
 
   if (code) {
@@ -15,29 +16,29 @@ export async function GET(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
+          getAll() { return cookieStore.getAll() },
           setAll(cookiesToSet) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
                 cookieStore.set(name, value, options)
               )
             } catch {
-              // Server Component-ში კუკების სეტვა ხანდახან იგნორირდება, 
-              // რაც ნორმალურია route handler-ისთვის
+              // Server Component-ში კუკების სეტვა ხანდახან იგნორირდება, რაც ნორმალურია
             }
           },
         },
       }
     )
 
+    // 🔐 აქ ხდება მთავარი ჯადოქრობა: მეილის კოდი იცვლება აქტიურ სესიაში!
     const { error } = await supabase.auth.exchangeCodeForSession(code)
+    
     if (!error) {
+      // ✅ სესია შეიქმნა, ვაგდებთ დანიშნულების ადგილას (Settings-ში)
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
 
-  // თუ რამე შეცდომაა, მაინც მთავარზე დააბრუნე
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  // ❌ თუ კოდი ვადაგასულია ან შეცდომაა, ვაბრუნებთ მთავარზე
+  return NextResponse.redirect(`${origin}/?error=auth_failed`)
 }

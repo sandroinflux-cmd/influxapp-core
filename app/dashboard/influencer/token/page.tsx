@@ -164,7 +164,7 @@ export default function TokenForge() {
                   <div className="animate-pulse h-96 w-96 bg-emerald-500/10 rounded-[40px]" />
                 ) : (
                   <motion.img 
-                    src={profile?.avatar_url || ''} 
+                    src={profile?.avatar_url || undefined} 
                     className="h-96 w-96 object-cover rounded-[40px] filter brightness-110 drop-shadow-[0_0_80px_#10b981cc]"
                     animate={{ y: [0, -20, 0], rotateY: [0, 15, -15, 0], scale: [1, 1.03, 1] }}
                     transition={{ repeat: Infinity, duration: 12, ease: "easeInOut" }}
@@ -204,7 +204,7 @@ export default function TokenForge() {
 
         /* 🚀 ULTRA-THICK MATRIX SCROLLBAR */
         .custom-token-scrollbar::-webkit-scrollbar {
-          width: 14px; /* 🚀 მნიშვნელოვნად დავასქელე */
+          width: 14px; 
         }
         .custom-token-scrollbar::-webkit-scrollbar-track {
           background: rgba(255, 255, 255, 0.03); 
@@ -214,11 +214,11 @@ export default function TokenForge() {
         .custom-token-scrollbar::-webkit-scrollbar-thumb {
           background: #10b981; 
           border-radius: 20px;
-          border: 3px solid #010201; /* 🚀 უფრო მკვეთრი იზოლაცია */
+          border: 3px solid #010201; 
           box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
         }
         .custom-token-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #34d399; /* ჰოვერზე უფრო ანათებს */
+          background: #34d399; 
         }
       `}</style>
     </main>

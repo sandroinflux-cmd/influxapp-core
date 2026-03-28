@@ -30,7 +30,7 @@ export default function Footer() {
           
           {/* 🏢 იურიდიული მონაცემები */}
           <p className="text-[8px] font-bold text-white/20 uppercase tracking-widest max-w-xs leading-loose">
-            შპს ინფლუ იქსი 2025 • ს/ნ: 406517675 • ქ. თბილისი, აწყურის ქ. N18
+            შპს ინფლუ იქსი 2025 INFLUX • ს/ნ: 406517675 •
           </p>
         </div>
         

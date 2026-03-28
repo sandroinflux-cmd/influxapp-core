@@ -39,7 +39,6 @@ export default function UnifiedWallet() {
             const { data: prof } = await supabase.from('profiles').select('id, full_name, avatar_url').eq('id', infId).single()
             const { data: dealsData } = await supabase.from('partnerships').select('*, deals(*)').eq('influencer_id', infId).eq('is_pushed_to_token', true)
             
-            // 🚀 გასწორდა: დაემატა : any[]
             let freshLiveDeals: any[] = []
             
             if (dealsData) {
@@ -82,7 +81,7 @@ export default function UnifiedWallet() {
       
       {/* 🛰️ HEADER */}
       <header className="w-full max-w-[340px] mt-8 mb-6 font-black italic uppercase text-center relative">
-        <h1 className="text-3xl tracking-tighter">Personal <span className="text-emerald-500 text-glow">Vault</span></h1>
+        <h1 className="text-3xl tracking-tighter">My <span className="text-emerald-500 text-glow">InfluX Tokens</span></h1>
       </header>
 
       {/* 💸 FINANCIAL DASHBOARD (ისტორია და დანაზოგი) */}
