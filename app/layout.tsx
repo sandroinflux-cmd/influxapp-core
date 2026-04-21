@@ -14,8 +14,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "InfluX Matrix | Node Asset v1.0",
-  description: "Secure Digital Asset Management Protocol",
+  title: "InfluX",
+  description: "CPA model for influencer marketing",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
