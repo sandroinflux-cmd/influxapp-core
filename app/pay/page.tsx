@@ -35,9 +35,10 @@ function PaymentContent() {
     let userDiscountPct = Number(p.user_discount_pct ?? 0)
     let influencerCutPct = Number(p.influencer_cut_pct ?? 0)
 
+    // ✅ მკაცრი სისტემური წესი: თუ ბაზაში ორივე 0-ია, ვიყენებთ მთლიან totalShare-ს სრულ ფასდაკლებაში
     if (userDiscountPct === 0 && influencerCutPct === 0 && totalShare > 0) {
-      userDiscountPct = Math.round(totalShare * 0.7)
-      influencerCutPct = totalShare - userDiscountPct
+      userDiscountPct = totalShare
+      influencerCutPct = 0
     }
 
     setActiveDeal({
@@ -55,7 +56,6 @@ function PaymentContent() {
       setLoading(true)
       setScannedBrand(brandId)
 
-      // 1. წამოვიღოთ ამ ბრენდის ყველა აქტიური პარტნიორობა
       const { data: allBrandPartnerships, error } = await supabase
         .from('partnerships')
         .select('*, deals(*)')
@@ -67,11 +67,9 @@ function PaymentContent() {
         return
       }
 
-      // უპირატესობა მივანიჭოთ ტოკენზე გაშვებულ (is_pushed_to_token = true) შეთავაზებებს
       const pushedPartnerships = allBrandPartnerships.filter((p: any) => p.is_pushed_to_token)
       const candidates = pushedPartnerships.length > 0 ? pushedPartnerships : allBrandPartnerships
 
-      // 2. თუ მომხმარებელი პირდაპირ /wallet-იდან შემოვიდა კონკრეტული არჩეული ტოკენით
       const activeTokenRaw = localStorage.getItem('matrix_active_token')
       if (activeTokenRaw) {
         const token = JSON.parse(activeTokenRaw)
@@ -83,7 +81,6 @@ function PaymentContent() {
         }
       }
 
-      // 3. შევამოწმოთ მომხმარებლის საფულეში (matrix_user_wallet) შენახული ტოკენები
       const walletRaw = localStorage.getItem('matrix_user_wallet')
       const wallet = walletRaw ? JSON.parse(walletRaw) : []
       const walletInfIds = [...new Set(wallet.map((t: any) => t.profile?.id || t.id).filter(Boolean))]
@@ -100,7 +97,6 @@ function PaymentContent() {
         return
       }
 
-      // 4. თუ საფულეში რამდენიმე შესაბამისი ტოკენია ან მომხმარებელმა TikTok/IG ბრაუზერში შეინახა ტოკენი
       const poolToShow = walletMatches.length > 1 ? walletMatches : candidates
 
       if (poolToShow.length === 1) {
@@ -108,7 +104,6 @@ function PaymentContent() {
         return
       }
 
-      // წამოვიღოთ ინფლუენსერების სახელები/ავატარები 1-კლიკიანი არჩევისთვის
       const infIds = [...new Set(poolToShow.map((p: any) => p.influencer_id).filter(Boolean))]
       const { data: profiles } = await supabase
         .from('profiles')
@@ -223,7 +218,7 @@ function PaymentContent() {
               const totalShare = Number(opt.total_percentage ?? dealObj?.totalShare ?? 0)
               const discount =
                 opt.user_discount_pct === 0 && opt.influencer_cut_pct === 0 && totalShare > 0
-                  ? Math.round(totalShare * 0.7)
+                  ? totalShare
                   : Number(opt.user_discount_pct ?? 0)
 
               return (

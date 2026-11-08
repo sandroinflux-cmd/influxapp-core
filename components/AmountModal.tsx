@@ -12,10 +12,9 @@ export default function AmountModal({ deal, onConfirm, onCancel }: any) {
   let userPct = Number(deal?.user_discount_pct ?? 0)
   let commissionPct = Number(deal?.influencer_cut_pct ?? 0)
 
-  // დაზღვევა: თუ ბაზაში ორივე 0-ია, მაგრამ totalShare > 0, გავყოთ ავტომატურად
   if (userPct === 0 && commissionPct === 0 && totalShare > 0) {
-    userPct = Math.round(totalShare * 0.7)
-    commissionPct = totalShare - userPct
+    userPct = totalShare
+    commissionPct = 0
   }
 
   const raw = parseFloat(inputAmount) || 0
