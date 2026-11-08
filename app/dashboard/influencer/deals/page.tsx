@@ -3,14 +3,19 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import Link from 'next/link'
+
+const isValidGeorgianIban = (iban?: string | null) =>
+  /^GE\d{2}[A-Z]{2}[A-Z0-9]{16}$/.test((iban || '').replace(/\s+/g, '').toUpperCase())
 
 export default function MyDealsPage() {
   const [activeDeals, setActiveDeals] = useState<any[]>([])
+  const [profileIban, setProfileIban] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [flippedId, setFlippedId] = useState<string | null>(null)
-  
+
   const [splittingDeal, setSplittingDeal] = useState<any | null>(null)
-  const [userDiscount, setUserDiscount] = useState<number>(1)
+  const [userDiscount, setUserDiscount] = useState<number>(0)
   const [isDeploying, setIsDeploying] = useState(false)
 
   useEffect(() => {
@@ -22,17 +27,21 @@ export default function MyDealsPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const { data, error } = await supabase
-          .from('partnerships')
-          .select('*, deals(*)')
-          .eq('influencer_id', user.id)
-          .eq('status', 'active')
+        const [{ data: profileData }, { data, error }] = await Promise.all([
+          supabase.from('profiles').select('iban').eq('id', user.id).single(),
+          supabase
+            .from('partnerships')
+            .select('*, deals(*)')
+            .eq('influencer_id', user.id)
+            .eq('status', 'active')
+        ])
 
+        setProfileIban(profileData?.iban || null)
         if (error) throw error
         if (data) setActiveDeals(data)
       }
     } catch (err: any) {
-      console.error("Fetch error:", err.message)
+      console.error('Fetch error:', err.message)
     } finally {
       setLoading(false)
     }
@@ -40,45 +49,51 @@ export default function MyDealsPage() {
 
   const finalizePush = async () => {
     if (!splittingDeal) return
+    if (!isValidGeorgianIban(profileIban)) {
+      alert('გთხოვთ, ჯერ მიუთითოთ ვალიდური ქართული IBAN (GE...) Settings გვერდზე.')
+      return
+    }
+
     setIsDeploying(true)
 
     try {
-      // 🚀 უნივერსალური ლოგიკა: deals შეიძლება იყოს ობიექტი ან სია
-      const currentDeal = Array.isArray(splittingDeal.deals) ? splittingDeal.deals[0] : splittingDeal.deals;
-      const total = Number(currentDeal?.totalShare || currentDeal?.discount_percent || 0);
-      const discount = Number(userDiscount);
-      const influencerCut = total - discount;
+      const currentDeal = Array.isArray(splittingDeal.deals) ? splittingDeal.deals[0] : splittingDeal.deals
+      const total = Number(currentDeal?.totalShare ?? splittingDeal?.total_percentage ?? 0)
+      const discount = Math.min(Math.max(0, Number(userDiscount)), total)
+      const influencerCut = Math.max(0, total - discount)
 
-      // 🔍 .select() უზრუნველყოფს, რომ გავიგოთ ნამდვილად შეცვალა თუ არა ბაზამ მონაცემი
       const { data, error } = await supabase
         .from('partnerships')
-        .update({ 
+        .update({
           user_discount_pct: discount,
           influencer_cut_pct: influencerCut,
-          commission_percent: influencerCut,
-          is_pushed_to_token: true 
+          is_pushed_to_token: true
         })
         .eq('id', splittingDeal.id)
-        .select() 
+        .select()
 
       if (error) throw new Error(error.message)
-      
+
       if (!data || data.length === 0) {
-        throw new Error("Update Blocked! Row Level Security (RLS) restricts this action in Supabase.")
+        throw new Error('Update Blocked! Row Level Security (RLS) restricts this action in Supabase.')
       }
 
-      // 🚀 Optimistic Update: ეგრევე ვცვლით UI-ში, რომ რეფრეშს არ დაველოდოთ
-      setActiveDeals(prev => prev.map(deal => 
-        deal.id === splittingDeal.id 
-          ? { ...deal, is_pushed_to_token: true, user_discount_pct: discount, influencer_cut_pct: influencerCut, commission_percent: influencerCut } 
-          : deal
-      ))
+      setActiveDeals(prev =>
+        prev.map(deal =>
+          deal.id === splittingDeal.id
+            ? {
+                ...deal,
+                is_pushed_to_token: true,
+                user_discount_pct: discount,
+                influencer_cut_pct: influencerCut
+              }
+            : deal
+        )
+      )
 
       setSplittingDeal(null)
-
     } catch (err: any) {
-      // 🔴 აქ ამოაგდებს ზუსტ მიზეზს, თუ რატომ არ ემატება!
-      alert("MATRIX ERROR: " + err.message)
+      alert('MATRIX ERROR: ' + err.message)
     } finally {
       setIsDeploying(false)
     }
@@ -90,13 +105,12 @@ export default function MyDealsPage() {
     </div>
   )
 
-  // მოდალისთვის მნიშვნელობების ამოღება უსაფრთხოდ
-  const modalDealData = splittingDeal ? (Array.isArray(splittingDeal.deals) ? splittingDeal.deals[0] : splittingDeal.deals) : null;
-  const modalTotalShare = Number(modalDealData?.totalShare || modalDealData?.discount_percent || 0);
+  const modalDealData = splittingDeal ? (Array.isArray(splittingDeal.deals) ? splittingDeal.deals[0] : splittingDeal.deals) : null
+  const modalTotalShare = Number(modalDealData?.totalShare ?? splittingDeal?.total_percentage ?? 0)
+  const hasValidIban = isValidGeorgianIban(profileIban)
 
   return (
     <div className="p-4 md:p-10 lg:p-14 space-y-12 max-w-6xl mx-auto pb-32 font-sans text-white overflow-x-hidden">
-      
       <header className="flex justify-between items-center border-b border-white/5 pb-10 italic font-black uppercase">
         <div>
           <h1 className="text-4xl tracking-tighter leading-none">My <span className="text-emerald-500 italic">Vault</span></h1>
@@ -104,30 +118,76 @@ export default function MyDealsPage() {
         </div>
       </header>
 
+      {!hasValidIban && (
+        <div className="bg-amber-500/10 border border-amber-500/40 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-400">
+            ⚠️ ტოკენზე შეთავაზების გასაშვებად აუცილებელია ვალიდური ქართული IBAN ანგარიშის მითითება.
+          </p>
+          <Link
+            href="/dashboard/influencer/settings"
+            className="px-6 py-3 bg-amber-500 text-black font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-amber-400 transition-all shrink-0"
+          >
+            Set IBAN in Settings
+          </Link>
+        </div>
+      )}
+
       <AnimatePresence>
         {splittingDeal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[300] flex items-center justify-center p-4 backdrop-blur-xl bg-black/60">
             <div className="bg-[#020502] border border-emerald-500/30 rounded-[40px] p-10 w-full max-w-md shadow-2xl text-center italic font-black uppercase">
-              <div className="space-y-12">
+              <div className="space-y-10">
                 <div>
                   <span className="text-[8px] text-gray-500 tracking-widest block mb-2 leading-none">Total Share Power</span>
                   <p className="text-5xl">{modalTotalShare}%</p>
                 </div>
+
                 <div className="space-y-6 text-left">
-                  <div className="flex justify-between text-[9px] tracking-widest leading-none">
-                    <span className="text-emerald-500 font-black uppercase">USER: {userDiscount}%</span>
-                    <span className="text-white/30 font-black uppercase">YOU: {modalTotalShare - userDiscount}%</span>
+                  <div className="flex justify-between text-[10px] tracking-widest leading-none">
+                    <span className="text-emerald-500 font-black uppercase">USER DISCOUNT: {userDiscount}%</span>
+                    <span className="text-white/70 font-black uppercase">YOUR CUT: {modalTotalShare - userDiscount}%</span>
                   </div>
-                  <input 
-                    type="range" 
-                    min="1" 
-                    max={modalTotalShare > 1 ? modalTotalShare - 1 : 1} 
-                    value={userDiscount} 
-                    onChange={(e) => setUserDiscount(parseInt(e.target.value) || 1)} 
-                    className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-emerald-500" 
+
+                  <input
+                    type="range"
+                    min={0}
+                    max={modalTotalShare}
+                    step={1}
+                    value={userDiscount}
+                    onChange={(e) => setUserDiscount( Number(e.target.value) )}
+                    className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-emerald-500"
                   />
+
+                  <div className="flex justify-between gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setUserDiscount(0)}
+                      className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[8px] tracking-widest text-gray-300"
+                    >
+                      100% MY COMMISSION
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserDiscount(Math.round(modalTotalShare / 2))}
+                      className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[8px] tracking-widest text-gray-300"
+                    >
+                      50 / 50 SPLIT
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserDiscount(modalTotalShare)}
+                      className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[8px] tracking-widest text-emerald-400"
+                    >
+                      100% USER DISCOUNT
+                    </button>
+                  </div>
                 </div>
-                <button disabled={isDeploying} onClick={finalizePush} className="w-full bg-white text-black py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.4em] hover:bg-emerald-500 hover:text-white transition-all active:scale-95 disabled:opacity-50">
+
+                <button
+                  disabled={isDeploying || !hasValidIban}
+                  onClick={finalizePush}
+                  className="w-full bg-white text-black py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.4em] hover:bg-emerald-500 hover:text-white transition-all active:scale-95 disabled:opacity-50"
+                >
                   {isDeploying ? 'SYNCING...' : 'CONFIRM PROTOCOL'}
                 </button>
                 <button onClick={() => setSplittingDeal(null)} className="text-[8px] opacity-30 mt-4 tracking-widest uppercase hover:text-white">Abort</button>
@@ -139,21 +199,21 @@ export default function MyDealsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16">
         {activeDeals.map((item) => {
-          const dealData = Array.isArray(item.deals) ? item.deals[0] : item.deals;
-          const totalShare = Number(dealData?.totalShare || dealData?.discount_percent || 0);
+          const dealData = Array.isArray(item.deals) ? item.deals[0] : item.deals
+          const totalShare = Number(dealData?.totalShare ?? item.total_percentage ?? 0)
 
           return (
             <div key={item.id} className="relative group h-[480px]" style={{ perspective: '2000px' }}>
-              <motion.div 
-                className="w-full h-[450px] relative cursor-pointer" 
-                style={{ transformStyle: 'preserve-3d' }} 
-                animate={{ rotateY: flippedId === item.id ? 180 : 0 }} 
-                transition={{ duration: 0.6, type: "spring", stiffness: 200, damping: 20 }} 
+              <motion.div
+                className="w-full h-[450px] relative cursor-pointer"
+                style={{ transformStyle: 'preserve-3d' }}
+                animate={{ rotateY: flippedId === item.id ? 180 : 0 }}
+                transition={{ duration: 0.6, type: 'spring', stiffness: 200, damping: 20 }}
                 onClick={() => setFlippedId(flippedId === item.id ? null : item.id)}
               >
-                {/* 💠 FRONT SIDE */}
-                <div 
-                  className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[60px] p-8 flex flex-col justify-between shadow-2xl group-hover:border-emerald-500/40 transition-colors duration-500 overflow-hidden" 
+                {/* FRONT SIDE */}
+                <div
+                  className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[60px] p-8 flex flex-col justify-between shadow-2xl group-hover:border-emerald-500/40 transition-colors duration-500 overflow-hidden"
                   style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
                 >
                   <div className="flex flex-col items-center text-center w-full mt-2">
@@ -173,43 +233,49 @@ export default function MyDealsPage() {
                     <h3 className="text-8xl md:text-[110px] font-black italic tracking-tighter text-white group-hover:text-emerald-500 transition-colors leading-none drop-shadow-[0_0_30px_rgba(0,0,0,0.5)]">
                       {totalShare}<span className="text-2xl md:text-3xl not-italic font-light ml-1 opacity-40">%</span>
                     </h3>
+                    {item.is_pushed_to_token && (
+                      <p className="text-[9px] text-emerald-400 uppercase tracking-widest mt-2 font-black">
+                        User: {item.user_discount_pct ?? 0}% | You: {item.influencer_cut_pct ?? 0}%
+                      </p>
+                    )}
                   </div>
 
                   <div className="relative w-full h-12 flex justify-center items-end pb-2">
                     <div className="text-center opacity-30 italic absolute transition-opacity duration-300 group-hover:opacity-0">
                       <p className="text-[8px] font-black uppercase tracking-[0.5em] animate-pulse">Double Tap to Flip</p>
                     </div>
-                    
+
                     <div className="opacity-0 group-hover:opacity-100 transition-all duration-500 transform translate-y-4 group-hover:translate-y-0 absolute w-full z-20">
-                      {/* 🚀 ერთხელ დამატებული აღარ ემატება! */}
-                      {item.is_pushed_to_token ? (
-                        <div className="w-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] text-center shadow-xl italic cursor-not-allowed">
-                          SYNCED TO TOKEN ✓
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            setSplittingDeal(item); 
-                            setUserDiscount(item.user_discount_pct || Math.max(1, Math.floor(totalShare * 0.7))); 
-                          }} 
-                          className="w-full bg-white text-black py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-emerald-500 hover:text-white transition-all italic active:scale-95 shadow-xl"
-                        >
-                          ADD TO TOKEN
-                        </button>
-                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSplittingDeal(item)
+                          const currentDiscount =
+                            item.is_pushed_to_token
+                              ? Number(item.user_discount_pct ?? 0)
+                              : Math.round(totalShare * 0.7)
+                          setUserDiscount(currentDiscount)
+                        }}
+                        className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] transition-all italic active:scale-95 shadow-xl ${
+                          item.is_pushed_to_token
+                            ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500 hover:text-black'
+                            : 'bg-white text-black hover:bg-emerald-500 hover:text-white'
+                        }`}
+                      >
+                        {item.is_pushed_to_token ? 'SYNCED ✓ (EDIT SPLIT)' : 'ADD TO TOKEN'}
+                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* 💠 BACK SIDE */}
-                <div 
-                  className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[60px] p-12 flex flex-col justify-between shadow-2xl" 
+                {/* BACK SIDE */}
+                <div
+                  className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[60px] p-12 flex flex-col justify-between shadow-2xl"
                   style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                 >
                   <div className="space-y-8 font-black italic uppercase leading-none">
                     <h4 className="text-[10px] text-emerald-500 tracking-[0.6em] border-b border-white/10 pb-4">About Brand</h4>
-                    
+
                     <div className="space-y-6">
                       <div className="group/item">
                         <span className="text-[8px] text-gray-600 tracking-widest block mb-1">Sector Node</span>
