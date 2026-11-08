@@ -73,7 +73,7 @@ export default function InfluencerSettingsPage() {
     setIsSaving(true)
     
     // 🚀 IBAN-ის გასუფთავება
-    const cleanIban = iban.replace(/\s/g, '').toUpperCase();
+    const cleanIban = iban.replace(/\s+/g, '').toUpperCase();
     const socialsJson = JSON.stringify({ instagram, tiktok, youtube })
 
     try {

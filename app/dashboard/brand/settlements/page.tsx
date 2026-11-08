@@ -24,7 +24,7 @@ export default function BillingLedgerPage() {
         .from('transactions')
         .select('id, amount, final_amount, created_at, influencer_id')
         .eq('brand_id', user.id)
-        .eq('status', 'success')
+        .in('status', ['approved', 'success'])
         .order('created_at', { ascending: false })
 
       if (txData && txData.length > 0) {

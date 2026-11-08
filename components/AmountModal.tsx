@@ -6,8 +6,9 @@ import { motion } from 'framer-motion'
 export default function AmountModal({ deal, onConfirm, onCancel }: any) {
   const [inputAmount, setInputAmount] = useState('')
   
-  const userPct = deal?.user_discount_pct || 20;
-  const influencerPct = deal?.influencer_cut_pct || 9;
+  const userPct = deal?.user_discount_pct ?? 0;
+  const commissionPct = deal?.influencer_cut_pct ?? deal?.commission_percent ?? 0;
+  const influencerPct = commissionPct;
   const systemPct = deal?.system_fee_pct || 4;
   const brandPct = deal?.brand_cut_pct || 67;
 
@@ -72,7 +73,7 @@ export default function AmountModal({ deal, onConfirm, onCancel }: any) {
           <div className="flex flex-col gap-3 pt-4">
             <button 
               disabled={raw <= 0}
-              onClick={() => onConfirm(finalPayable, { influencerEarnings: (raw * influencerPct)/100, systemFee: (raw * systemPct)/100, brandAmount: (raw * brandPct)/100 })}
+              onClick={() => onConfirm(finalPayable, { rawAmount: raw, discountPct: userPct, commissionPct, influencerEarnings: (raw * influencerPct)/100, systemFee: (raw * systemPct)/100, brandAmount: (raw * brandPct)/100 })}
               className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-20 py-5 rounded-2xl font-bold text-sm shadow-[0_15px_30px_rgba(37,99,235,0.3)] transition-all active:scale-95"
             >
               CONFIRM & PAY

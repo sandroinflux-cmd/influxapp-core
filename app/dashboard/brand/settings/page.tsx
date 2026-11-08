@@ -76,7 +76,7 @@ export default function BrandSettingsPage() {
     setIsSaving(true)
     try {
       // 🚀 IBAN-ის გასუფთავება (სპეისების მოშორება და UpperCase)
-      const cleanIban = iban.replace(/\s/g, '').toUpperCase();
+      const cleanIban = iban.replace(/\s+/g, '').toUpperCase();
 
       const { error } = await supabase
         .from('profiles')
@@ -136,7 +136,8 @@ export default function BrandSettingsPage() {
     img.src = `data:image/svg+xml;base64,${btoa(svgData)}`
   }
 
-  const qrUrl = `https://shordomain.com/pay/${brandId || 'demo'}`
+  const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || '');
+  const qrUrl = `${origin}/pay/${brandId || 'demo'}`
 
   return (
     <main className="min-h-screen w-full bg-[#010201] text-white p-6 md:p-14 overflow-x-hidden font-sans">

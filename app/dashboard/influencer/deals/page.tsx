@@ -55,6 +55,7 @@ export default function MyDealsPage() {
         .update({ 
           user_discount_pct: discount,
           influencer_cut_pct: influencerCut,
+          commission_percent: influencerCut,
           is_pushed_to_token: true 
         })
         .eq('id', splittingDeal.id)
@@ -69,7 +70,7 @@ export default function MyDealsPage() {
       // 🚀 Optimistic Update: ეგრევე ვცვლით UI-ში, რომ რეფრეშს არ დაველოდოთ
       setActiveDeals(prev => prev.map(deal => 
         deal.id === splittingDeal.id 
-          ? { ...deal, is_pushed_to_token: true, user_discount_pct: discount, influencer_cut_pct: influencerCut } 
+          ? { ...deal, is_pushed_to_token: true, user_discount_pct: discount, influencer_cut_pct: influencerCut, commission_percent: influencerCut } 
           : deal
       ))
 

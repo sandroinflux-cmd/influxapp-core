@@ -17,7 +17,7 @@ export default function InfluencerOnboarding() {
       .eq('id', user.id)
 
     if (error) alert('Username already taken!')
-    else router.push('/dashboard/user/wallet') // ვოლეტში გადაყვანა
+    else router.push('/dashboard/influencer')
   }
 
   return (

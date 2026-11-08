@@ -33,7 +33,7 @@ export default function SettlementLedger() {
         .from('transactions')
         .select('*')
         .eq('influencer_id', user.id)
-        .eq('status', 'success')
+        .in('status', ['approved', 'success'])
         .order('created_at', { ascending: false })
 
       if (error) throw error

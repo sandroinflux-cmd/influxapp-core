@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, Suspense } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
 import AmountModal from '@/components/AmountModal'
@@ -19,62 +19,101 @@ const QRScanner = dynamic(() => import('@/components/QRScanner'), {
 
 function PaymentContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const brandFromUrl = searchParams.get('brand') || searchParams.get('brandId')
+  const autoResolved = useRef(false)
+
   const [step, setStep] = useState<'scan' | 'amount' | 'no-partnership'>('scan')
   const [scannedBrand, setScannedBrand] = useState<string | null>(null)
   const [activeDeal, setActiveDeal] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(!!brandFromUrl)
 
-  const handleScanSuccess = async (decodedText: string) => {
+  const applyPartnership = (p: any) => {
+    setActiveDeal({
+      ...p,
+      brand: p.deals?.title || 'MATRIX PARTNER',
+      logo: p.deals?.logo || '💎'
+    })
+    setStep('amount')
+  }
+
+  const resolvePartnership = async (brandId: string) => {
     try {
       setLoading(true)
-      let brandId = decodedText.trim();
-      if (brandId.includes('/')) brandId = brandId.split('/').filter(p => p.length > 0).pop() || brandId;
-      if (brandId.includes('brand=')) brandId = brandId.split('brand=').pop() || brandId;
-      brandId = brandId.split('?')[0];
+      setScannedBrand(brandId)
 
-      setScannedBrand(brandId);
-      const activeTokenRaw = localStorage.getItem('matrix_active_token');
-      
+      const activeTokenRaw = localStorage.getItem('matrix_active_token')
+
       if (activeTokenRaw) {
-        const token = JSON.parse(activeTokenRaw);
-        const influencerId = token.profile?.id || token.id;
+        const token = JSON.parse(activeTokenRaw)
+        const influencerId = token.profile?.id || token.id
 
-        // 🔍 პარტნიორობის ამოღება (deals ცხრილთან ერთად)
         const { data: p, error } = await supabase
           .from('partnerships')
           .select('*, deals(*)')
           .eq('influencer_id', influencerId)
           .eq('brand_id', brandId)
-          .single();
+          .single()
 
         if (!p || error) {
-          setStep('no-partnership');
+          setStep('no-partnership')
         } else {
-          // 🚀 ვიღებთ პირდაპირ deals ცხრილიდან!
-          setActiveDeal({
-            ...p,
-            brand: p.deals?.title || 'MATRIX PARTNER',
-            logo: p.deals?.logo || '💎'
-          });
-          setStep('amount');
+          applyPartnership(p)
         }
-      } else {
-        setStep('no-partnership');
+        return
       }
-    } catch (err) { 
-      setStep('no-partnership');
+
+      const walletRaw = localStorage.getItem('matrix_user_wallet')
+      const wallet = walletRaw ? JSON.parse(walletRaw) : []
+      const infIds = [...new Set(wallet.map((t: any) => t.profile?.id || t.id).filter(Boolean))]
+
+      if (infIds.length > 0) {
+        const { data: partnerships } = await supabase
+          .from('partnerships')
+          .select('*, deals(*)')
+          .eq('brand_id', brandId)
+          .in('influencer_id', infIds)
+
+        const p = partnerships?.[0]
+        if (p) {
+          const matchedToken = wallet.find((t: any) => (t.profile?.id || t.id) === p.influencer_id)
+          if (matchedToken) {
+            localStorage.setItem('matrix_active_token', JSON.stringify(matchedToken))
+          }
+          applyPartnership(p)
+          return
+        }
+      }
+
+      setStep('no-partnership')
+    } catch (err) {
+      setStep('no-partnership')
     } finally {
       setLoading(false)
     }
   }
 
-  const handlePaymentConfirm = async (finalPayable: number) => {
+  useEffect(() => {
+    if (!brandFromUrl || autoResolved.current) return
+    autoResolved.current = true
+    resolvePartnership(brandFromUrl)
+  }, [brandFromUrl])
+
+  const handleScanSuccess = async (decodedText: string) => {
+    let brandId = decodedText.trim();
+    if (brandId.includes('/')) brandId = brandId.split('/').filter(p => p.length > 0).pop() || brandId;
+    if (brandId.includes('brand=')) brandId = brandId.split('brand=').pop() || brandId;
+    brandId = brandId.split('?')[0];
+    await resolvePartnership(brandId)
+  }
+
+  const handlePaymentConfirm = async (finalPayable: number, splitMeta?: { rawAmount?: number; discountPct?: number; commissionPct?: number }) => {
     setLoading(true)
     try {
-      const discountPct = activeDeal?.user_discount_pct || 0;
-      const commissionPct = activeDeal?.commission_percent || 15;
+      const discountPct = splitMeta?.discountPct ?? activeDeal?.user_discount_pct ?? 0;
+      const commissionPct = splitMeta?.commissionPct ?? activeDeal?.influencer_cut_pct ?? activeDeal?.commission_percent ?? 0;
       
-      const rawAmount = discountPct < 100 ? (finalPayable / (1 - (discountPct / 100))) : finalPayable;
+      const rawAmount = splitMeta?.rawAmount ?? (discountPct < 100 ? (finalPayable / (1 - (discountPct / 100))) : finalPayable);
       const influencerEarned = (rawAmount * commissionPct) / 100;
       const brandEarned = finalPayable - influencerEarned;
 

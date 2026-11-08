@@ -113,23 +113,30 @@ export async function POST(request: Request) {
     const { data: brandProf } = await supabase.from('profiles').select('iban').eq('id', brandId).single()
     const { data: influProf } = await supabase.from('profiles').select('iban').eq('id', influencerId).single()
 
-    const brandIban = brandProf?.iban?.trim();
-    const influencerIban = influProf?.iban?.trim();
+    const sanitizeIban = (iban?: string | null) => (iban || '').replace(/\s+/g, '').toUpperCase()
+    const roundMoney = (value: number) => Number(Number(value || 0).toFixed(2))
+
+    const brandIban = sanitizeIban(brandProf?.iban);
+    const influencerIban = sanitizeIban(influProf?.iban);
+    const roundedBrandEarned = roundMoney(brandEarned)
+    const roundedInfluencerEarned = roundMoney(influencerEarned)
+    const roundedAmount = roundMoney(amount)
+    const roundedFinalAmount = roundMoney(finalAmount)
 
     // 🛡️ 2. ვამზადებთ Split მასივს ბანკისთვის (მხოლოდ ვალიდური თანხებისთვის და IBAN-ებისთვის)
     const splitPayments = [];
     
-    if (brandIban && brandEarned > 0) {
+    if (brandIban && roundedBrandEarned > 0) {
       splitPayments.push({
-        amount: Number(brandEarned.toFixed(2)),
+        amount: Number(roundedBrandEarned.toFixed(2)),
         iban: brandIban,
         description: "InfluX Brand Payout" // BOG წესი: მაქს 25 სიმბოლო
       });
     }
 
-    if (influencerIban && influencerEarned > 0) {
+    if (influencerIban && roundedInfluencerEarned > 0) {
       splitPayments.push({
-        amount: Number(influencerEarned.toFixed(2)),
+        amount: Number(roundedInfluencerEarned.toFixed(2)),
         iban: influencerIban,
         description: "InfluX Partner Payout" // BOG წესი: მაქს 25 სიმბოლო
       });
@@ -139,20 +146,20 @@ export async function POST(request: Request) {
     const { data: tx, error: txError } = await supabase
       .from('transactions')
       .insert([{
-        bill_amount: amount,
-        final_amount: finalAmount,
-        amount: amount, 
+        bill_amount: roundedAmount,
+        final_amount: roundedFinalAmount,
+        amount: roundedAmount, 
         brand_id: brandId,
         influencer_id: influencerId,
         deal_id: dealId,
         discount_percent: discountPercent,
         commission_percent: commissionPercent,
-        brand_earned: brandEarned,
-        influencer_earned: influencerEarned,
+        brand_earned: roundedBrandEarned,
+        influencer_earned: roundedInfluencerEarned,
         brand_iban: brandIban || '',
         influencer_iban: influencerIban || '',
         status: 'pending',
-        system_fee: finalAmount - brandEarned - influencerEarned // პლატფორმის საკომისიო
+        system_fee: roundMoney(roundedFinalAmount - roundedBrandEarned - roundedInfluencerEarned)
       }])
       .select()
       .single()
@@ -163,7 +170,7 @@ export async function POST(request: Request) {
     const bogToken = await getBogToken()
     
     // გადავცემთ splitPayments მასივს
-    const bogOrder = await createBogOrder(bogToken, tx.id, finalAmount, splitPayments)
+    const bogOrder = await createBogOrder(bogToken, tx.id, roundedFinalAmount, splitPayments)
 
     const bankCheckoutUrl = bogOrder._links.redirect.href
     return NextResponse.json({ checkoutUrl: bankCheckoutUrl })
