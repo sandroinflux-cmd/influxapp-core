@@ -155,14 +155,18 @@ export default function UnifiedWallet() {
                 onDealClick={(deal) => {
                   const influencerId = token.profile?.id
                   if (!influencerId) return
+                  const brandId = deal.brandId
                   trackTokenEvent({
                     influencerId,
                     eventType: 'deal_click',
-                    brandId: deal.brandId,
+                    brandId,
                     partnershipId: deal.partnershipId,
                     dealId: deal.dealId,
                     source: 'wallet',
                   })
+                  if (!brandId) return
+                  localStorage.setItem('matrix_active_token', JSON.stringify(token))
+                  router.push(`/pay?brand=${brandId}&influencer=${influencerId}`)
                 }}
               >
                 <button 

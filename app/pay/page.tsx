@@ -7,6 +7,34 @@ import dynamic from 'next/dynamic'
 import AmountModal from '@/components/AmountModal'
 import { motion } from 'framer-motion'
 
+function storedInfluencerProfile(influencerId: string) {
+  const tokens: any[] = []
+  try {
+    const activeRaw = localStorage.getItem('matrix_active_token')
+    if (activeRaw) tokens.push(JSON.parse(activeRaw))
+  } catch { /* ignore unreadable token */ }
+  try {
+    const walletRaw = localStorage.getItem('matrix_user_wallet')
+    const wallet = walletRaw ? JSON.parse(walletRaw) : []
+    if (Array.isArray(wallet)) tokens.push(...wallet)
+  } catch { /* ignore unreadable wallet */ }
+
+  for (const token of tokens) {
+    const profile = token?.profile
+    const id = profile?.id || token?.id
+    if (id !== influencerId) continue
+    if (profile?.avatar_url && profile?.full_name) {
+      return {
+        id: profile.id || influencerId,
+        full_name: profile.full_name,
+        username: profile.username || null,
+        avatar_url: profile.avatar_url,
+      }
+    }
+  }
+  return null
+}
+
 const QRScanner = dynamic(() => import('@/components/QRScanner'), {
   ssr: false,
   loading: () => (
@@ -21,6 +49,7 @@ function PaymentContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const brandFromUrl = searchParams.get('brand') || searchParams.get('brandId')
+  const influencerFromUrl = searchParams.get('influencer') || searchParams.get('influencerId')
   const autoResolved = useRef(false)
 
   const [step, setStep] = useState<'scan' | 'select-token' | 'amount' | 'no-partnership'>('scan')
@@ -29,7 +58,7 @@ function PaymentContent() {
   const [availableOptions, setAvailableOptions] = useState<any[]>([])
   const [loading, setLoading] = useState(!!brandFromUrl)
 
-  const applyPartnership = (p: any) => {
+  const applyPartnership = async (p: any) => {
     const dealObj = Array.isArray(p.deals) ? p.deals[0] : p.deals
     const totalShare = Number(p.total_percentage ?? dealObj?.totalShare ?? 0)
     let userDiscountPct = Number(p.user_discount_pct ?? 0)
@@ -41,17 +70,35 @@ function PaymentContent() {
       influencerCutPct = 0
     }
 
+    let influencerProfile = p.influencerProfile || null
+    if (!influencerProfile && p.influencer_id) {
+      influencerProfile = storedInfluencerProfile(p.influencer_id)
+    }
+    if ((!influencerProfile || !influencerProfile.avatar_url) && p.influencer_id) {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, avatar_url')
+          .eq('id', p.influencer_id)
+          .maybeSingle()
+        if (data) influencerProfile = data
+      } catch {
+        // Keep a partial profile so checkout still opens.
+      }
+    }
+
     setActiveDeal({
       ...p,
       user_discount_pct: userDiscountPct,
       influencer_cut_pct: influencerCutPct,
       brand: dealObj?.title || 'MATRIX PARTNER',
-      logo: dealObj?.logo || '💎'
+      logo: dealObj?.logo || '💎',
+      influencerProfile
     })
     setStep('amount')
   }
 
-  const resolvePartnership = async (brandId: string) => {
+  const resolvePartnership = async (brandId: string, preferredInfluencerId?: string | null) => {
     try {
       setLoading(true)
       setScannedBrand(brandId)
@@ -70,13 +117,23 @@ function PaymentContent() {
       const pushedPartnerships = allBrandPartnerships.filter((p: any) => p.is_pushed_to_token)
       const candidates = pushedPartnerships.length > 0 ? pushedPartnerships : allBrandPartnerships
 
+      if (preferredInfluencerId) {
+        const matched = candidates.find((p: any) => p.influencer_id === preferredInfluencerId)
+        if (matched) {
+          await applyPartnership(matched)
+          return
+        }
+        setStep('no-partnership')
+        return
+      }
+
       const activeTokenRaw = localStorage.getItem('matrix_active_token')
       if (activeTokenRaw) {
         const token = JSON.parse(activeTokenRaw)
         const influencerId = token.profile?.id || token.id
         const matched = candidates.find((p: any) => p.influencer_id === influencerId)
         if (matched) {
-          applyPartnership(matched)
+          await applyPartnership(matched)
           return
         }
       }
@@ -93,14 +150,14 @@ function PaymentContent() {
         if (matchedToken) {
           localStorage.setItem('matrix_active_token', JSON.stringify(matchedToken))
         }
-        applyPartnership(chosen)
+        await applyPartnership(chosen)
         return
       }
 
       const poolToShow = walletMatches.length > 1 ? walletMatches : candidates
 
       if (poolToShow.length === 1) {
-        applyPartnership(poolToShow[0])
+        await applyPartnership(poolToShow[0])
         return
       }
 
@@ -127,8 +184,8 @@ function PaymentContent() {
   useEffect(() => {
     if (!brandFromUrl || autoResolved.current) return
     autoResolved.current = true
-    resolvePartnership(brandFromUrl)
-  }, [brandFromUrl])
+    resolvePartnership(brandFromUrl, influencerFromUrl)
+  }, [brandFromUrl, influencerFromUrl])
 
   const handleScanSuccess = async (decodedText: string) => {
     let brandId = decodedText.trim()
@@ -224,7 +281,7 @@ function PaymentContent() {
               return (
                 <button
                   key={opt.id}
-                  onClick={() => applyPartnership(opt)}
+                  onClick={async () => { await applyPartnership(opt) }}
                   className="w-full p-4 rounded-2xl bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/40 flex items-center justify-between transition-all text-left"
                 >
                   <div>

@@ -5,25 +5,26 @@ import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
 
 // ✅ განახლებული GridDealCard Intel-ის მხარდაჭერით
 function GridDealCard({ deal, onDealClick }: { deal: any; onDealClick?: (deal: any) => void }) {
-  const [isGridCardFlipped, setIsGridCardFlipped] = useState(false)
-  
+  const stopCardFlip = (e: React.SyntheticEvent) => {
+    e.stopPropagation()
+  }
+
   return (
     <motion.div 
-      className="relative cursor-pointer h-[240px]" // ფიქსირებული სიმაღლე გრიდისთვის
+      className="relative cursor-pointer h-[240px] group/deal"
       style={{ transformStyle: 'preserve-3d', perspective: "1000px" }}
-      animate={{ rotateY: isGridCardFlipped ? 180 : 0 }}
-      transition={{ duration: 0.6, type: "spring", stiffness: 200, damping: 20 }}
+      whileTap={{ scale: 0.97 }}
       onClick={(e) => {
         e.stopPropagation()
-        const opening = !isGridCardFlipped
-        setIsGridCardFlipped(opening)
-        if (opening) onDealClick?.(deal)
+        onDealClick?.(deal)
       }}
-      onDoubleClick={(e) => e.stopPropagation()}
+      onDoubleClick={stopCardFlip}
+      onPointerDown={stopCardFlip}
+      onMouseDown={stopCardFlip}
     >
       {/* 💠 FRONT SIDE */}
       <div 
-        className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[35px] p-5 flex flex-col justify-between shadow-inner relative overflow-hidden group/deal" 
+        className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[35px] p-5 flex flex-col justify-between shadow-inner relative overflow-hidden transition-colors group-hover/deal:border-emerald-500/40 group-active/deal:bg-white/[0.03]" 
         style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'translateZ(1px)' }}
       >
         <div className="flex flex-col items-center gap-2 relative z-10 text-center">
@@ -41,14 +42,16 @@ function GridDealCard({ deal, onDealClick }: { deal: any; onDealClick?: (deal: a
           {deal.offer}
         </h2>
         
-        <div className="text-[6px] text-gray-700 text-center tracking-[0.3em] uppercase font-black italic opacity-0 group-hover/deal:opacity-100 transition-opacity">
-          Tap to INSPECT
+        <div className="flex items-center justify-end relative z-10">
+          <span className="text-[7px] text-emerald-500/70 group-hover/deal:text-emerald-400 tracking-[0.28em] uppercase font-black italic transition-colors">
+            PAY →
+          </span>
         </div>
       </div>
 
       {/* 💠 BACK SIDE (Passport Intel Style) */}
       <div 
-        className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[35px] p-5 flex flex-col justify-between shadow-inner" 
+        className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[35px] p-5 flex flex-col justify-between shadow-inner pointer-events-none" 
         style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg) translateZ(1px)' }}
       >
         <div className="space-y-3 font-black italic uppercase leading-none">

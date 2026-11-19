@@ -3,6 +3,14 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 
+function initialsFromName(name: string | null) {
+  if (!name) return ''
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return ''
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return parts[0].slice(0, 2).toUpperCase()
+}
+
 export default function AmountModal({ deal, onConfirm, onCancel }: any) {
   const [inputAmount, setInputAmount] = useState('')
 
@@ -25,17 +33,46 @@ export default function AmountModal({ deal, onConfirm, onCancel }: any) {
 
   const brandName = deal?.brands?.name || deal?.brand || dealObj?.title || deal?.title || 'MATRIX PARTNER'
   const brandLogo = deal?.brands?.logo || deal?.logo || dealObj?.logo || '💎'
+  const influencer = deal?.influencerProfile || null
+  const influencerAvatar = influencer?.avatar_url || null
+  const influencerName = influencer?.full_name || influencer?.username || null
+  const influencerHandle = influencer?.username ? '@' + String(influencer.username).replace(/^@/, '') : null
+  const avatarIsUrl = typeof influencerAvatar === 'string' && influencerAvatar.startsWith('http')
+  const influencerInitials = initialsFromName(influencerName)
+  const showInfluencer = !!(deal?.influencer_id || influencer)
+  const creatorLine = influencerName
+    ? `Token by ${influencerName}`
+    : influencerHandle
+      ? `Via ${influencerHandle}`
+      : null
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
       <div className="w-full max-w-[400px] bg-[#050505] border border-blue-500/30 rounded-[35px] p-8 animate-in zoom-in-95 duration-300 shadow-[0_0_80px_rgba(37,99,235,0.2)] relative">
         <div className="flex flex-col items-center mb-8 border-b border-white/5 pb-6">
-          <div className="h-14 w-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden mb-3 shadow-inner">
-            {brandLogo.startsWith('http')
-              ? <img src={brandLogo} alt="brand" className="h-full w-full object-cover" />
-              : <span className="text-2xl">{brandLogo}</span>}
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <div className="h-14 w-14 shrink-0 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shadow-inner">
+              {typeof brandLogo === 'string' && brandLogo.startsWith('http')
+                ? <img src={brandLogo} alt="brand" className="h-full w-full object-cover" />
+                : <span className="text-2xl">{brandLogo}</span>}
+            </div>
+            {showInfluencer && (
+              <>
+                <span className="text-[13px] text-white/30 font-light leading-none select-none">×</span>
+                <div className="h-14 w-14 shrink-0 rounded-full bg-[#07140f] border border-emerald-400/50 ring-2 ring-blue-500/30 flex items-center justify-center overflow-hidden shadow-[0_0_18px_rgba(16,185,129,0.28)]">
+                  {avatarIsUrl
+                    ? <img src={influencerAvatar} alt={influencerName || 'creator'} className="h-full w-full object-cover" />
+                    : <span className="text-[13px] font-black italic text-emerald-300 tracking-widest">{influencerInitials || '•'}</span>}
+                </div>
+              </>
+            )}
           </div>
           <span className="text-xs font-black text-white uppercase italic tracking-widest text-center">{brandName}</span>
+          {creatorLine && (
+            <span className="text-[8px] font-black tracking-[0.28em] text-emerald-400/80 uppercase mt-1.5 italic text-center">
+              {creatorLine}
+            </span>
+          )}
           <span className="text-[8px] font-black tracking-[0.4em] text-blue-500 uppercase mt-1 italic">Secure Checkout</span>
         </div>
 

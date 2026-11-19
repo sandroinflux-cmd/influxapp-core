@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import InfluXCard from '@/components/InfluXCard'
 import { trackTokenEvent } from '@/lib/trackTokenEvent'
@@ -17,6 +17,7 @@ function walletOwns(influencerId: string) {
 }
 
 function ClaimContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const influencerId = searchParams.get('ref')
   
@@ -158,14 +159,20 @@ function ClaimContent() {
           }}
           onDealClick={(deal) => {
             if (!influencerId) return
+            const brandId = deal.brandId
             trackTokenEvent({
               influencerId,
               eventType: 'deal_click',
-              brandId: deal.brandId,
+              brandId,
               partnershipId: deal.partnershipId,
               dealId: deal.dealId,
               source: 'claim',
             })
+            const inWallet = walletOwns(influencerId)
+            const limitReached = soldOut || atLimit
+            if ((limitReached && !inWallet) || !brandId || !profile) return
+            localStorage.setItem('matrix_active_token', JSON.stringify({ profile, liveDeals }))
+            router.push(`/pay?brand=${brandId}&influencer=${influencerId}`)
           }}
         >
           
