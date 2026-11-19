@@ -2,6 +2,11 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+  if (pathname.startsWith('/monitor') || pathname.startsWith('/api/monitor')) {
+    return NextResponse.next()
+  }
+
   let response = NextResponse.next({
     request: { headers: request.headers },
   })
@@ -27,7 +32,6 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const pathname = request.nextUrl.pathname
 
   // 🔓 1. გამონაკლისი: /wallet და /claim გვერდებზე ყველას ვუშვებთ უპირობოდ
   if (pathname.startsWith('/wallet') || pathname.startsWith('/claim')) {
@@ -70,5 +74,5 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   //Matcher-ში დავტოვოთ მხოლოდ ის გვერდები, რომლებსაც კონტროლი სჭირდება
-  matcher: ['/dashboard/:path*', '/signup'],
+  matcher: ['/dashboard/:path*', '/signup', '/monitor/:path*', '/api/monitor/:path*'],
 }

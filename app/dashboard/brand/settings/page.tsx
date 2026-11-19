@@ -17,6 +17,9 @@ export default function BrandSettingsPage() {
   
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [monitorToken, setMonitorToken] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [resettingLink, setResettingLink] = useState(false)
   const qrRef = useRef<SVGSVGElement>(null)
   const [isMounted, setIsMounted] = useState(false)
 
@@ -28,7 +31,7 @@ export default function BrandSettingsPage() {
         setBrandId(user.id)
         const { data } = await supabase
           .from('profiles')
-          .select('iban, full_name, avatar_url, sector, address, bio')
+          .select('iban, full_name, avatar_url, sector, address, bio, monitor_token')
           .eq('id', user.id)
           .single()
 
@@ -41,6 +44,13 @@ export default function BrandSettingsPage() {
           if (data.avatar_url) {
             setAvatarUrl(data.avatar_url)
             setAvatarPreview(data.avatar_url)
+          }
+          if (data.monitor_token) {
+            setMonitorToken(data.monitor_token)
+          } else {
+            const token = crypto.randomUUID()
+            const { error } = await supabase.from('profiles').update({ monitor_token: token }).eq('id', user.id)
+            if (!error) setMonitorToken(token)
           }
         }
       }
@@ -115,8 +125,29 @@ export default function BrandSettingsPage() {
     }
   }
 
-  const terminalUrl = isMounted ? `${window.location.origin}/dashboard/cashier/monitor?brand=${brandId}` : ''
-  const copyTerminalLink = () => { navigator.clipboard.writeText(terminalUrl); alert("TERMINAL LINK SECURED 📟"); }
+  const monitorUrl = isMounted && monitorToken ? `${window.location.origin}/monitor/${monitorToken}` : ''
+  const copyMonitorLink = async () => {
+    if (!monitorUrl) return
+    await navigator.clipboard.writeText(monitorUrl)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 2000)
+  }
+  const resetMonitorLink = async () => {
+    if (!brandId) return
+    if (!window.confirm('Reset the monitor link? Anyone using the old link will lose access.')) return
+    setResettingLink(true)
+    try {
+      const token = crypto.randomUUID()
+      const { error } = await supabase.from('profiles').update({ monitor_token: token }).eq('id', brandId)
+      if (error) throw error
+      setMonitorToken(token)
+      setCopied(false)
+    } catch (error: any) {
+      alert('MATRIX ERROR: ' + error.message)
+    } finally {
+      setResettingLink(false)
+    }
+  }
   
   const downloadQR = () => {
     if (!qrRef.current) return
@@ -206,18 +237,32 @@ export default function BrandSettingsPage() {
 
             <div className="bg-blue-600/[0.03] border border-blue-500/20 rounded-[40px] p-10 relative overflow-hidden shadow-2xl">
               <div className="flex items-center justify-between mb-8">
-                <h3 className="text-[12px] font-black uppercase tracking-[0.5em] text-blue-500 italic mb-2">Terminal Node</h3>
+                <h3 className="text-[12px] font-black uppercase tracking-[0.5em] text-blue-500 italic mb-2">Live Monitor</h3>
                 <span className="text-blue-500 text-xs italic">📟</span>
               </div>
               <div className="space-y-4">
-                <div className="bg-black/40 border border-white/5 rounded-2xl p-5 flex items-center justify-between gap-4">
-                  <div className="overflow-hidden">
-                    <p className="text-[8px] text-gray-700 uppercase font-black tracking-widest mb-1 italic">Access Endpoint</p>
-                    <p className="text-[10px] text-blue-500/60 font-black italic truncate uppercase">{terminalUrl || 'Syncing...'}</p>
-                  </div>
-                  <button onClick={copyTerminalLink} className="shrink-0 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest italic transition-all">Copy Link</button>
+                <div className="bg-black/40 border border-white/5 rounded-2xl p-5">
+                  <p className="text-[8px] text-gray-700 uppercase font-black tracking-widest mb-2 italic">Shareable staff link</p>
+                  <p className="text-[11px] text-blue-300 font-bold break-all normal-case">{monitorUrl || 'Syncing...'}</p>
                 </div>
-                <p className="px-4 text-[8px] text-gray-700 font-black uppercase italic leading-relaxed tracking-wider">⚠️ share only with cashier nodes.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button onClick={copyMonitorLink} disabled={!monitorUrl} className="min-h-[44px] bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white px-4 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest italic transition-all">
+                    {copied ? 'Copied ✓' : 'Copy Link'}
+                  </button>
+                  <button
+                    onClick={() => monitorUrl && window.open(monitorUrl, '_blank', 'noopener,noreferrer')}
+                    disabled={!monitorUrl}
+                    className="min-h-[44px] bg-white/10 hover:bg-white/15 disabled:opacity-40 text-white px-4 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest italic transition-all"
+                  >
+                    Open Monitor
+                  </button>
+                  <button onClick={resetMonitorLink} disabled={!monitorToken || resettingLink} className="min-h-[44px] border border-red-500/40 text-red-300 hover:bg-red-500/10 disabled:opacity-40 px-4 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest italic transition-all">
+                    {resettingLink ? 'Resetting...' : 'Reset Link'}
+                  </button>
+                </div>
+                <p className="px-1 text-[11px] text-gray-400 leading-relaxed normal-case">
+                  Anyone with this link can open the mobile live monitor without signing in. Reset the link if it was shared with the wrong person.
+                </p>
               </div>
             </div>
           </div>
