@@ -169,6 +169,18 @@ function MonitorContent() {
                     CUSTOMER PAID: {lastPayment?.final_amount?.toFixed(2)} ₾
                   </p>
                 </div>
+                {(lastPayment?.gift_unlocked || lastPayment?.customer_phone) && (
+                  <div className="flex flex-col items-center gap-2">
+                    {lastPayment?.gift_unlocked && (
+                      <p className="text-sm font-black uppercase tracking-[0.25em] text-amber-300 italic">🎁 {lastPayment.gift_description || 'Gift included'}</p>
+                    )}
+                    {lastPayment?.customer_phone && (
+                      <a href={`tel:${String(lastPayment.customer_phone).replace(/[^\d+]/g, '')}`} className="text-sm font-black tracking-widest text-emerald-300 normal-case not-italic">
+                        {lastPayment.customer_phone}
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -187,6 +199,14 @@ function MonitorContent() {
                 <div className="text-right">
                   <span className="text-4xl font-black italic text-white leading-none block">{(tx.bill_amount || tx.initial_amount || 0).toFixed(2)} ₾</span>
                   <span className="text-[10px] font-black text-emerald-500/50 uppercase tracking-widest mt-2 block">PAID: {tx.final_amount.toFixed(2)} ₾</span>
+                  {tx.customer_phone && (
+                    <a href={`tel:${String(tx.customer_phone).replace(/[^\d+]/g, '')}`} className="text-[10px] font-black text-emerald-300 normal-case not-italic tracking-widest mt-1 block">
+                      {tx.customer_phone}
+                    </a>
+                  )}
+                  {tx.gift_unlocked && (
+                    <span className="text-[10px] font-black text-amber-300 normal-case not-italic tracking-wide mt-1 block">🎁 {tx.gift_description || 'Gift included'}</span>
+                  )}
                 </div>
               </motion.div>
             ))}

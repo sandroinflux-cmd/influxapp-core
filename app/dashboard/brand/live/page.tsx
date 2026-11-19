@@ -94,6 +94,19 @@ export default function LivePulsePage() {
                  <div>
                     <p className="text-sm text-white">TX-{tx.id.substring(0, 6).toUpperCase()}</p>
                     <p className="text-[7px] text-gray-600 tracking-widest mt-1.5">{timeAgo(tx.created_at)}</p>
+                    {tx.customer_phone && (
+                      <a
+                        href={`tel:${String(tx.customer_phone).replace(/[^\d+]/g, '')}`}
+                        className="mt-2 inline-flex normal-case not-italic text-[9px] font-black tracking-widest text-emerald-400 hover:text-emerald-300"
+                      >
+                        {tx.customer_phone}
+                      </a>
+                    )}
+                    {tx.gift_unlocked && (
+                      <p className="mt-1 text-[8px] text-amber-300 normal-case not-italic tracking-wide">
+                        🎁 {tx.gift_description || 'Gift included'}
+                      </p>
+                    )}
                  </div>
               </div>
               <div className="col-span-1 text-center text-[11px] text-gray-400">NODE_USR_{tx.id.substring(0, 3)}</div>

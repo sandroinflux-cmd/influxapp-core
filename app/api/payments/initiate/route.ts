@@ -123,6 +123,21 @@ export async function POST(request: Request) {
     const roundedAmount = roundMoney(amount)
     const roundedFinalAmount = roundMoney(finalAmount)
 
+    let serverGiftUnlocked = false
+    let serverGiftDescription: string | null = null
+    if (dealId) {
+      const { data: giftDeal } = await supabase
+        .from('deals')
+        .select('gift_description, gift_threshold')
+        .eq('id', dealId)
+        .maybeSingle()
+      const giftThreshold = Number(giftDeal?.gift_threshold || 0)
+      serverGiftUnlocked = Boolean(giftDeal?.gift_description)
+        && roundedFinalAmount > 0
+        && (giftThreshold <= 0 || roundedFinalAmount >= giftThreshold)
+      serverGiftDescription = serverGiftUnlocked ? giftDeal?.gift_description || null : null
+    }
+
     // 🛡️ 2. ვამზადებთ Split მასივს ბანკისთვის (მხოლოდ ვალიდური თანხებისთვის და IBAN-ებისთვის)
     const splitPayments = [];
     
@@ -159,7 +174,9 @@ export async function POST(request: Request) {
         brand_iban: brandIban || '',
         influencer_iban: influencerIban || '',
         status: 'pending',
-        system_fee: roundMoney(roundedFinalAmount - roundedBrandEarned - roundedInfluencerEarned)
+        system_fee: roundMoney(roundedFinalAmount - roundedBrandEarned - roundedInfluencerEarned),
+        gift_unlocked: serverGiftUnlocked,
+        gift_description: serverGiftDescription,
       }])
       .select()
       .single()

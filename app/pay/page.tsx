@@ -197,7 +197,13 @@ function PaymentContent() {
 
   const handlePaymentConfirm = async (
     finalPayable: number,
-    splitMeta?: { rawAmount?: number; discountPct?: number; commissionPct?: number }
+    splitMeta?: {
+      rawAmount?: number
+      discountPct?: number
+      commissionPct?: number
+      giftUnlocked?: boolean
+      giftDescription?: string | null
+    }
   ) => {
     setLoading(true)
     try {
@@ -225,7 +231,8 @@ function PaymentContent() {
           discountPercent: discountPct,
           commissionPercent: commissionPct,
           brandEarned,
-          influencerEarned
+          influencerEarned,
+          giftUnlocked: Boolean(splitMeta?.giftUnlocked),
         })
       })
 

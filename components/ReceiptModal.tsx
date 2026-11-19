@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 
-export default function ReceiptModal({ total, originalAmount, deal, onDone }: any) {
+export default function ReceiptModal({ total, originalAmount, deal, onDone, giftUnlocked = false, giftDescription = null, footer = null, obscured = false }: any) {
   const [time, setTime] = useState(new Date())
   const [hash, setHash] = useState('')
   const [influencer, setInfluencer] = useState<any>(null)
@@ -85,7 +85,7 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
   };
 
   return (
-    <div className="fixed inset-0 z-[300] bg-black/98 backdrop-blur-3xl flex flex-col items-center justify-center p-4 overflow-hidden font-sans">
+    <div className={`fixed inset-0 z-[300] bg-black/98 backdrop-blur-3xl flex flex-col items-center justify-center p-4 overflow-y-auto font-sans ${obscured ? 'blur-md pointer-events-none select-none' : ''}`}>
       
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
         {[...Array(2)].map((_, i) => (
@@ -182,6 +182,15 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
             </div>
           </div>
 
+          {giftUnlocked && (
+            <div className="bg-amber-400/10 border border-amber-300/40 rounded-[30px] py-4 px-4 flex flex-col items-center justify-center shadow-[0_0_24px_rgba(251,191,36,0.12)]">
+              <span className="text-[7px] font-black text-amber-300 uppercase tracking-[0.45em] italic">🎁 Gift Earned</span>
+              {giftDescription && (
+                <p className="mt-2 text-sm font-black text-white italic uppercase tracking-tight text-center leading-tight">{giftDescription}</p>
+              )}
+            </div>
+          )}
+
           <div className="bg-emerald-500/[0.06] border border-emerald-500/30 rounded-[30px] py-6 flex flex-col items-center justify-center relative overflow-hidden shadow-[0_0_30px_rgba(16,185,129,0.15)]">
             <span className="text-[7px] font-black text-emerald-500 uppercase tracking-[0.6em] mb-1 italic">Benefit Realized</span>
             {/* 🚀 გამოყენებულია დაცული რიცხვი */}
@@ -222,6 +231,7 @@ export default function ReceiptModal({ total, originalAmount, deal, onDone }: an
         <button onClick={onDone} className="w-full py-2 text-[7px] font-black text-gray-700 uppercase tracking-[0.3em] hover:text-white transition-colors italic">
           Dismiss Node
         </button>
+        {footer}
       </div>
     </div>
   )
