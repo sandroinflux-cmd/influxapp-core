@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import InfluXCard from '@/components/InfluXCard'
 import { motion, AnimatePresence } from 'framer-motion' 
 import { supabase } from '@/lib/supabase'
+import { trackTokenEvent } from '@/lib/trackTokenEvent'
 
 export default function UnifiedWallet() {
   const router = useRouter()
@@ -44,6 +45,9 @@ export default function UnifiedWallet() {
             if (dealsData) {
               freshLiveDeals = dealsData.map((d: any, i: number) => ({
                 id: d.id || i,
+                brandId: d.brand_id || null,
+                partnershipId: d.id || null,
+                dealId: d.deal_id || null,
                 brand: d.deals?.title || 'MATRIX NODE',
                 offer: `${d.user_discount_pct || 0}% OFF`,
                 logo: d.deals?.logo || '💎',
@@ -139,9 +143,31 @@ export default function UnifiedWallet() {
         ) : (
           tokens.map((token, idx) => (
             <div key={idx} className="relative w-full max-w-[340px] mx-auto flex flex-col items-center group">
-              <InfluXCard profile={token.profile} liveDeals={token.liveDeals} disableRotation={false}>
+              <InfluXCard
+                profile={token.profile}
+                liveDeals={token.liveDeals}
+                disableRotation={false}
+                onFlip={() => {
+                  const influencerId = token.profile?.id
+                  if (!influencerId) return
+                  trackTokenEvent({ influencerId, eventType: 'flip', source: 'wallet' })
+                }}
+                onDealClick={(deal) => {
+                  const influencerId = token.profile?.id
+                  if (!influencerId) return
+                  trackTokenEvent({
+                    influencerId,
+                    eventType: 'deal_click',
+                    brandId: deal.brandId,
+                    partnershipId: deal.partnershipId,
+                    dealId: deal.dealId,
+                    source: 'wallet',
+                  })
+                }}
+              >
                 <button 
                   onClick={(e) => handleScanToPay(e, token)}
+                  onDoubleClick={(e) => e.stopPropagation()}
                   className="px-10 py-3.5 bg-emerald-600 text-white rounded-full font-black text-[11px] uppercase tracking-[0.4em] shadow-[0_0_30px_rgba(16,185,129,0.5)] hover:bg-emerald-500 border border-white/10 active:scale-90 transition-all italic whitespace-nowrap"
                 >
                   SCAN TO PAY

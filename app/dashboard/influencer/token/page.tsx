@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion'
 
@@ -76,6 +76,12 @@ export default function TokenForge() {
   const [profile, setProfile] = useState<{ id: string; full_name: string; avatar_url: string } | null>(null)
   const [isProfileLoading, setIsProfileLoading] = useState(true)
   const [isCopied, setIsCopied] = useState(false)
+  const [tokenStats, setTokenStats] = useState({ views: 0, flips: 0, claims: 0, limit: 0 })
+  const [limitInput, setLimitInput] = useState('')
+  const [savingLimit, setSavingLimit] = useState(false)
+  const [limitSaved, setLimitSaved] = useState(false)
+  const [limitError, setLimitError] = useState<string | null>(null)
+  const limitDirty = useRef(false)
 
   const x = useMotionValue(0)
   const y = useMotionValue(0)
@@ -90,8 +96,23 @@ export default function TokenForge() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: profData } = await supabase.from('profiles').select('id, full_name, avatar_url').eq('id', user.id).single()
-      if (profData) setProfile(profData)
+      const fullSelect = 'id, full_name, avatar_url, token_limit, token_views, token_flips, token_claims'
+      let { data: profData, error: profError } = await supabase.from('profiles').select(fullSelect).eq('id', user.id).single()
+      if (profError) {
+        const fallback = await supabase.from('profiles').select('id, full_name, avatar_url').eq('id', user.id).single()
+        profData = fallback.data as any
+      }
+      if (profData) {
+        setProfile({ id: profData.id, full_name: profData.full_name, avatar_url: profData.avatar_url })
+        const limit = Number(profData.token_limit || 0)
+        setTokenStats({
+          views: Number(profData.token_views || 0),
+          flips: Number(profData.token_flips || 0),
+          claims: Number(profData.token_claims || 0),
+          limit,
+        })
+        if (!limitDirty.current) setLimitInput(limit > 0 ? String(limit) : '')
+      }
       setIsProfileLoading(false)
 
       const { data: dealsData } = await supabase.from('partnerships').select('*, deals(*)').eq('influencer_id', user.id)
@@ -115,6 +136,35 @@ export default function TokenForge() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
+  const saveTokenLimit = async () => {
+    if (!profile || savingLimit) return
+    setSavingLimit(true)
+    setLimitError(null)
+    setLimitSaved(false)
+
+    try {
+      const raw = limitInput.trim()
+      const parsed = raw === '' ? 0 : Math.floor(Number(raw))
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        setLimitError('ENTER A SUPPLY NUMBER, OR LEAVE IT EMPTY')
+        return
+      }
+
+      const { error } = await supabase.from('profiles').update({ token_limit: parsed }).eq('id', profile.id)
+      if (error) throw error
+
+      setTokenStats((prev) => ({ ...prev, limit: parsed }))
+      limitDirty.current = false
+      setLimitInput(parsed > 0 ? String(parsed) : '')
+      setLimitSaved(true)
+      setTimeout(() => setLimitSaved(false), 2000)
+    } catch (err: any) {
+      setLimitError(err?.message || 'COULD NOT SAVE SUPPLY LIMIT')
+    } finally {
+      setSavingLimit(false)
+    }
+  }
+
   const handleDeployLink = () => {
     if (!profile) return
     const deployUrl = `${window.location.origin}/claim?ref=${profile.id}`
@@ -124,20 +174,58 @@ export default function TokenForge() {
   }
 
   return (
-    <main className="min-h-screen w-full bg-[#010201] text-white p-6 md:p-14 overflow-hidden font-sans flex flex-col items-center relative">
+    <main className="min-h-screen w-full bg-[#010201] text-white p-6 md:p-14 overflow-x-hidden font-sans flex flex-col items-center relative">
       <div className="absolute inset-0 bg-black/50 bg-[linear-gradient(rgba(16,185,129,0.02)_1.5px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.02)_1.5px,transparent_1px)] bg-[size:30px_30px] opacity-30" />
 
-      <header className="w-full mb-8 flex justify-between items-start z-10">
+      <header className="w-full mb-8 flex flex-wrap justify-between items-start gap-6 z-10">
         <div>
            <span className="text-emerald-500/40 text-[9px] tracking-[0.8em] mb-4 block leading-none font-black uppercase italic">Matrix Node Asset v1.0</span>
            <h1 className="text-7xl tracking-tighter uppercase leading-none font-black italic">Token</h1>
         </div>
-        <button 
-          onClick={handleDeployLink}
-          className={`mt-4 px-10 py-4 rounded-full border-2 transition-all duration-500 font-black text-[10px] uppercase tracking-[0.3em] italic ${isCopied ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10' : 'border-white/10 hover:border-emerald-500/40 bg-white/5'}`}
-        >
-          {isCopied ? 'Transmission Sent ✓' : 'Deploy Asset Link +'}
-        </button>
+        <div className="mt-4 flex flex-col items-stretch md:items-end gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <input
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              placeholder="Unlimited"
+              value={limitInput}
+              onChange={(e) => { limitDirty.current = true; setLimitInput(e.target.value) }}
+              onKeyDown={(e) => { if (e.key === 'Enter') saveTokenLimit() }}
+              aria-label="Token supply limit"
+              className="w-32 px-4 py-4 rounded-full border-2 border-white/10 bg-white/5 text-white font-black text-[10px] uppercase tracking-[0.2em] italic outline-none placeholder:text-white/30 focus:border-emerald-500/40"
+            />
+            <button
+              onClick={saveTokenLimit}
+              disabled={savingLimit}
+              className="px-6 py-4 rounded-full border-2 border-emerald-500/40 text-emerald-400 bg-emerald-500/10 font-black text-[10px] uppercase tracking-[0.3em] italic disabled:opacity-50"
+            >
+              {savingLimit ? 'Saving' : limitSaved ? 'Saved ✓' : 'Save'}
+            </button>
+            <button 
+              onClick={handleDeployLink}
+              className={`px-10 py-4 rounded-full border-2 transition-all duration-500 font-black text-[10px] uppercase tracking-[0.3em] italic ${isCopied ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10' : 'border-white/10 hover:border-emerald-500/40 bg-white/5'}`}
+            >
+              {isCopied ? 'Transmission Sent ✓' : 'Deploy Asset Link +'}
+            </button>
+          </div>
+          <p className="text-[9px] font-black uppercase tracking-[0.28em] italic text-white/40 text-right">
+            <span className="text-emerald-500/50">Views</span> {tokenStats.views}
+            <span className="mx-2 text-white/15">·</span>
+            <span className="text-emerald-500/50">Flips</span> {tokenStats.flips}
+            <span className="mx-2 text-white/15">·</span>
+            <span className="text-emerald-500/50">Claims</span> {tokenStats.claims}
+            {tokenStats.limit > 0 && (
+              <>
+                <span className="mx-2 text-white/15">·</span>
+                <span className="text-emerald-500/50">Remaining</span> {Math.max(0, tokenStats.limit - tokenStats.claims)}
+              </>
+            )}
+          </p>
+          <p className="text-[8px] font-black uppercase tracking-[0.28em] italic text-white/25 text-right">Empty or 0 = Unlimited</p>
+          {limitError && <p className="text-[8px] font-black uppercase tracking-[0.2em] italic text-red-400 text-right">{limitError}</p>}
+        </div>
       </header>
 
       <div 

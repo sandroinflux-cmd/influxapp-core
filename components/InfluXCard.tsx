@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
 
 // ✅ განახლებული GridDealCard Intel-ის მხარდაჭერით
-function GridDealCard({ deal }: { deal: any }) {
+function GridDealCard({ deal, onDealClick }: { deal: any; onDealClick?: (deal: any) => void }) {
   const [isGridCardFlipped, setIsGridCardFlipped] = useState(false)
   
   return (
@@ -13,7 +13,13 @@ function GridDealCard({ deal }: { deal: any }) {
       style={{ transformStyle: 'preserve-3d', perspective: "1000px" }}
       animate={{ rotateY: isGridCardFlipped ? 180 : 0 }}
       transition={{ duration: 0.6, type: "spring", stiffness: 200, damping: 20 }}
-      onClick={(e) => { e.stopPropagation(); setIsGridCardFlipped(!isGridCardFlipped); }}
+      onClick={(e) => {
+        e.stopPropagation()
+        const opening = !isGridCardFlipped
+        setIsGridCardFlipped(opening)
+        if (opening) onDealClick?.(deal)
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
     >
       {/* 💠 FRONT SIDE */}
       <div 
@@ -77,9 +83,11 @@ interface InfluXCardProps {
   deal?: any;
   children?: React.ReactNode;
   disableRotation?: boolean;
+  onFlip?: () => void;
+  onDealClick?: (deal: any) => void;
 }
 
-export default function InfluXCard({ profile, liveDeals = [], deal, children, disableRotation = false }: InfluXCardProps) {
+export default function InfluXCard({ profile, liveDeals = [], deal, children, disableRotation = false, onFlip, onDealClick }: InfluXCardProps) {
   const [isFlipped, setIsFlipped] = useState(false)
   const x = useMotionValue(0), y = useMotionValue(0)
   const mouseXSpring = useSpring(x, { stiffness: 60, damping: 50 }), mouseYSpring = useSpring(y, { stiffness: 60, damping: 50 })
@@ -98,7 +106,11 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
       <div className="relative w-full" 
            onMouseMove={(e) => { if(!disableRotation) { const rect = e.currentTarget.getBoundingClientRect(); x.set(e.clientX - (rect.left + rect.width / 2)); y.set(e.clientY - (rect.top + rect.height / 2)) } }} 
            onMouseLeave={() => { x.set(0); y.set(0) }} 
-           onDoubleClick={() => setIsFlipped(!isFlipped)}>
+           onDoubleClick={() => {
+             const opening = !isFlipped
+             setIsFlipped(opening)
+             if (opening) onFlip?.()
+           }}>
         
         <motion.div 
           style={{ rotateX: isFlipped ? 0 : rotateX, rotateY: isFlipped ? 180 : rotateY, transformStyle: "preserve-3d", perspective: "2000px", WebkitTransformStyle: "preserve-3d" }} 
@@ -150,7 +162,7 @@ export default function InfluXCard({ profile, liveDeals = [], deal, children, di
             <div className="w-full h-full p-6 pt-8 overflow-y-auto scrollbar-hide bg-[radial-gradient(circle_at_0%_0%,#ffffff03,transparent_60%)]">
               <div className="grid grid-cols-2 gap-3 pb-4">
                 {liveDeals.length > 0 ? liveDeals.map((d) => (
-                  <GridDealCard key={d.id} deal={d} />
+                  <GridDealCard key={d.id} deal={d} onDealClick={onDealClick} />
                 )) : (
                   <div className="col-span-2 text-center py-20 opacity-20 font-black italic uppercase text-[10px] tracking-widest">
                     No Deals Linked

@@ -1,17 +1,59 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { supabase } from '@/lib/supabase'
+
+function uniqueVisitors(rows: any[]) {
+  return new Set(rows.map((row) => row.visitor_id || row.id)).size
+}
+
+function percent(part: number, whole: number) {
+  if (!whole) return '0.0'
+  return ((part / whole) * 100).toFixed(1)
+}
+
+function money(value: number) {
+  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function dealTitle(partnership: any) {
+  const deal = Array.isArray(partnership?.deals) ? partnership.deals[0] : partnership?.deals
+  return deal?.title || null
+}
+
+async function fetchAll(run: (from: number, to: number) => PromiseLike<{ data: any[] | null; error: any }>) {
+  const pageSize = 1000
+  const rows: any[] = []
+  let from = 0
+  while (from <= 20000) {
+    const { data, error } = await run(from, from + pageSize - 1)
+    if (error) throw error
+    const batch = data || []
+    rows.push(...batch)
+    if (batch.length < pageSize) break
+    from += pageSize
+  }
+  return rows
+}
+
+const EMPTY_FUNNEL = {
+  views: 0,
+  flips: 0,
+  clickUnique: 0,
+  clickTotal: 0,
+  claims: 0,
+  purchases: 0,
+}
 
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [chartData, setChartData] = useState<any[]>([])
   const [topBrands, setTopBrands] = useState<any[]>([])
-  const [topOwners, setTopOwners] = useState<any[]>([])
+  const [brandRows, setBrandRows] = useState<any[]>([])
   const [totalOwners, setTotalOwners] = useState(0)
   const [conversionRate, setConversionRate] = useState('0.0')
+  const [funnel, setFunnel] = useState(EMPTY_FUNNEL)
 
   useEffect(() => {
     fetchAnalytics()
@@ -23,14 +65,123 @@ export default function AnalyticsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: txs, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('influencer_id', user.id)
-        .eq('status', 'approved') // 🎯 გასწორდა
-        .order('created_at', { ascending: true })
+      let events: any[] = []
+      let partnerships: any[] = []
+      let txs: any[] = []
 
-      if (error) throw error
+      try {
+        events = await fetchAll((from, to) =>
+          supabase
+            .from('token_events')
+            .select('id, visitor_id, event_type, brand_id, influencer_id')
+            .eq('influencer_id', user.id)
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to)
+        )
+      } catch (error) {
+        console.error('Token events unavailable:', error)
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('partnerships')
+          .select('*, deals(*)')
+          .eq('influencer_id', user.id)
+        if (error) throw error
+        partnerships = data || []
+      } catch (error) {
+        console.error('Partnerships unavailable:', error)
+      }
+
+      try {
+        txs = await fetchAll((from, to) =>
+          supabase
+            .from('transactions')
+            .select('*')
+            .eq('influencer_id', user.id)
+            .in('status', ['approved', 'success'])
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to)
+        )
+      } catch (error) {
+        console.error('Transactions unavailable:', error)
+      }
+
+      const viewRows = events.filter((event) => event.event_type === 'view')
+      const flipRows = events.filter((event) => event.event_type === 'flip')
+      const clickRows = events.filter((event) => event.event_type === 'deal_click')
+      const claimRows = events.filter((event) => event.event_type === 'claim')
+      const views = uniqueVisitors(viewRows)
+      const flips = uniqueVisitors(flipRows)
+      const clickUnique = uniqueVisitors(clickRows)
+      const claims = uniqueVisitors(claimRows)
+
+      setFunnel({
+        views,
+        flips,
+        clickUnique,
+        clickTotal: clickRows.length,
+        claims,
+        purchases: txs.length,
+      })
+      setConversionRate(percent(txs.length, claims))
+
+      const brandIds = [...new Set(
+        [...events.map((event) => event.brand_id), ...txs.map((tx) => tx.brand_id), ...partnerships.map((partnership) => partnership.brand_id)].filter(Boolean)
+      )]
+      let brandProfiles: any[] = []
+      if (brandIds.length > 0) {
+        const { data } = await supabase.from('profiles').select('id, full_name').in('id', brandIds)
+        brandProfiles = data || []
+      }
+      const profileName = new Map(brandProfiles.map((brand) => [brand.id, brand.full_name]))
+      const dealName = new Map<string, string>()
+      partnerships.forEach((partnership) => {
+        if (!partnership.brand_id || dealName.has(partnership.brand_id)) return
+        const title = dealTitle(partnership)
+        if (title) dealName.set(partnership.brand_id, title)
+      })
+
+      const buckets = new Map<string, { clickVisitors: Set<string>; clicks: number; claimVisitors: Set<string>; purchases: number; revenue: number }>()
+      const ensure = (brandId: string) => {
+        if (!buckets.has(brandId)) {
+          buckets.set(brandId, { clickVisitors: new Set(), clicks: 0, claimVisitors: new Set(), purchases: 0, revenue: 0 })
+        }
+        return buckets.get(brandId)!
+      }
+
+      partnerships.forEach((partnership) => {
+        if (partnership.brand_id) ensure(partnership.brand_id)
+      })
+      events.forEach((event) => {
+        if (!event.brand_id) return
+        const bucket = ensure(event.brand_id)
+        const visitor = event.visitor_id || event.id
+        if (event.event_type === 'deal_click') {
+          bucket.clicks += 1
+          bucket.clickVisitors.add(visitor)
+        }
+        if (event.event_type === 'claim') bucket.claimVisitors.add(visitor)
+      })
+      txs.forEach((tx) => {
+        if (!tx.brand_id) return
+        const bucket = ensure(tx.brand_id)
+        bucket.purchases += 1
+        bucket.revenue += Number(tx.influencer_earned) || 0
+      })
+
+      setBrandRows([...buckets.entries()].map(([brandId, bucket]) => ({
+        id: brandId,
+        name: profileName.get(brandId) || dealName.get(brandId) || 'MATRIX NODE',
+        uniqueClicks: bucket.clickVisitors.size,
+        totalClicks: bucket.clicks,
+        claims: bucket.claimVisitors.size,
+        purchases: bucket.purchases,
+        revenue: money(bucket.revenue),
+        rawRevenue: bucket.revenue,
+      })).sort((a, b) => b.rawRevenue - a.rawRevenue || b.totalClicks - a.totalClicks))
 
       const { data: brandsData } = await supabase
         .from('profiles')
@@ -39,7 +190,7 @@ export default function AnalyticsPage() {
 
       const brandMap = new Map(brandsData?.map(b => [b.id, b.full_name]) || [])
 
-      if (txs && txs.length > 0) {
+      if (txs.length > 0) {
         const monthlyData: Record<string, { name: string, income: number, ownerSet: Set<string> }> = {}
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
         const allUniqueOwners = new Set<string>()
@@ -67,7 +218,6 @@ export default function AnalyticsPage() {
         })))
 
         setTotalOwners(allUniqueOwners.size)
-        setConversionRate((Math.min(100, (allUniqueOwners.size / (txs.length || 1)) * 45)).toFixed(1))
 
         const brandStats: Record<string, { scans: number, revenue: number }> = {}
         txs.forEach(tx => {
@@ -83,21 +233,10 @@ export default function AnalyticsPage() {
           rawRevenue: stats.revenue,
           scans: stats.scans
         })).sort((a, b) => b.rawRevenue - a.rawRevenue).slice(0, 3))
-
-        const ownerStats: Record<string, { scans: number, spent: number }> = {}
-        txs.forEach(tx => {
-          const oId = tx.token_id || 'UNKNOWN'
-          if (!ownerStats[oId]) ownerStats[oId] = { scans: 0, spent: 0 }
-          ownerStats[oId].scans += 1
-          ownerStats[oId].spent += Number(tx.influencer_earned) || 0
-        })
-
-        setTopOwners(Object.entries(ownerStats).map(([oId, stats]) => ({
-          id: `OWNER_${oId.substring(0, 4).toUpperCase()}`,
-          spent: stats.spent.toLocaleString('en-US', { minimumFractionDigits: 2 }),
-          rawSpent: stats.spent,
-          scans: stats.scans
-        })).sort((a, b) => b.rawSpent - a.rawSpent).slice(0, 3))
+      } else {
+        setChartData([])
+        setTopBrands([])
+        setTotalOwners(0)
       }
     } catch (error) {
       console.error('Analytics Error:', error)
@@ -105,6 +244,14 @@ export default function AnalyticsPage() {
       setLoading(false)
     }
   }
+
+  const stages = [
+    { label: 'Token Views', value: funnel.views, detail: 'Unique people' },
+    { label: 'Token Flips', value: funnel.flips, detail: `${percent(funnel.flips, funnel.views)}% of views` },
+    { label: 'Brand Deal Clicks', value: funnel.clickUnique, detail: `${funnel.clickTotal} clicks · ${percent(funnel.clickUnique, funnel.views)}% of views` },
+    { label: 'Token Claims', value: funnel.claims, detail: `${percent(funnel.claims, funnel.views)}% of views` },
+    { label: 'Purchases / Conversions', value: funnel.purchases, detail: `${percent(funnel.purchases, funnel.claims)}% of claims` },
+  ]
 
   if (loading) return <div className="min-h-screen bg-[#010201] flex items-center justify-center text-emerald-500 font-black italic animate-pulse uppercase tracking-widest">Analyzing Matrix...</div>
 
@@ -120,6 +267,51 @@ export default function AnalyticsPage() {
           <div><span className="text-[8px] text-emerald-500/60 block mb-1">Conversion</span><p className="text-4xl text-emerald-500">{conversionRate}%</p></div>
         </div>
       </header>
+
+      <section className="mb-12">
+        <h4 className="text-[10px] text-emerald-500/40 tracking-[0.5em] ml-4 mb-6">Token Funnel</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+          {stages.map((stage) => (
+            <div key={stage.label} className="bg-white/[0.02] border border-white/5 rounded-[32px] p-6">
+              <span className="text-[8px] text-gray-600 tracking-[0.2em] block mb-3">{stage.label}</span>
+              <p className="text-4xl tracking-tighter">{stage.value}</p>
+              <p className="text-[8px] text-emerald-500/70 mt-3 tracking-[0.12em] normal-case">{stage.detail}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-12">
+        <h4 className="text-[10px] text-emerald-500/40 tracking-[0.5em] ml-4 mb-6">Per-Brand Breakdown</h4>
+        <div className="bg-white/[0.02] border border-white/5 rounded-[40px] overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left">
+            <thead>
+              <tr className="text-[8px] text-gray-600 tracking-[0.3em] border-b border-white/5">
+                <th className="px-8 py-5 font-black">Brand Name</th>
+                <th className="px-6 py-5 font-black">Deal Clicks</th>
+                <th className="px-6 py-5 font-black">Claims</th>
+                <th className="px-6 py-5 font-black">Purchases</th>
+                <th className="px-8 py-5 font-black text-right">Total Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {brandRows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-8 py-10 text-[10px] text-gray-600 tracking-[0.3em]">No partnered brands yet</td>
+                </tr>
+              ) : brandRows.map((brand) => (
+                <tr key={brand.id} className="border-b border-white/5 last:border-0">
+                  <td className="px-8 py-6 text-lg">{brand.name}</td>
+                  <td className="px-6 py-6">{brand.uniqueClicks} <span className="text-[10px] text-gray-600">unique</span> · {brand.totalClicks}</td>
+                  <td className="px-6 py-6">{brand.claims}</td>
+                  <td className="px-6 py-6">{brand.purchases}</td>
+                  <td className="px-8 py-6 text-right text-emerald-500">{brand.revenue} ₾</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="bg-[#040d08]/40 border border-white/5 rounded-[55px] p-12 mb-12 backdrop-blur-3xl h-[450px]">
         <div className="h-full w-full">

@@ -2,87 +2,193 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { motion } from 'framer-motion'
-import { AreaChart, Area, ResponsiveContainer, LineChart, Line } from 'recharts'
+
+function uniqueVisitors(rows: any[]) {
+  return new Set(rows.map((row) => row.visitor_id || row.id)).size
+}
+
+function percent(part: number, whole: number) {
+  if (!whole) return '0.0'
+  return ((part / whole) * 100).toFixed(1)
+}
+
+function money(value: number) {
+  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+async function fetchAll(run: (from: number, to: number) => PromiseLike<{ data: any[] | null; error: any }>) {
+  const pageSize = 1000
+  const rows: any[] = []
+  let from = 0
+  while (from <= 20000) {
+    const { data, error } = await run(from, from + pageSize - 1)
+    if (error) throw error
+    const batch = data || []
+    rows.push(...batch)
+    if (batch.length < pageSize) break
+    from += pageSize
+  }
+  return rows
+}
+
+const EMPTY_FUNNEL = {
+  views: 0,
+  clickUnique: 0,
+  clickTotal: 0,
+  claims: 0,
+  purchases: 0,
+}
 
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const [metrics, setMetrics] = useState({ revenue: 0, sales: 0, loyalty: '0.0x' })
-  const [chartData, setChartData] = useState<any[]>([])
-  const [influencerNodes, setInfluencerNodes] = useState<any[]>([])
+  const [funnel, setFunnel] = useState(EMPTY_FUNNEL)
+  const [influencerRows, setInfluencerRows] = useState<any[]>([])
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setLoading(false)
+        return
+      }
 
-      const { data: txData } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('brand_id', user.id)
-        .eq('status', 'approved') // 🎯 გასწორდა
+      let events: any[] = []
+      let partnerships: any[] = []
+      let txData: any[] = []
 
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name')
+      try {
+        events = await fetchAll((from, to) =>
+          supabase
+            .from('token_events')
+            .select('id, visitor_id, event_type, brand_id, influencer_id')
+            .eq('brand_id', user.id)
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to)
+        )
+      } catch (error) {
+        console.error('Token events unavailable:', error)
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('partnerships')
+          .select('influencer_id, brand_id')
+          .eq('brand_id', user.id)
+        if (error) throw error
+        partnerships = data || []
+      } catch (error) {
+        console.error('Partnerships unavailable:', error)
+      }
+
+      try {
+        txData = await fetchAll((from, to) =>
+          supabase
+            .from('transactions')
+            .select('*')
+            .eq('brand_id', user.id)
+            .in('status', ['approved', 'success'])
+            .order('created_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to)
+        )
+      } catch (error) {
+        console.error('Transactions unavailable:', error)
+      }
+
+      const viewRows = events.filter((event) => event.event_type === 'view')
+      const clickRows = events.filter((event) => event.event_type === 'deal_click')
+      const claimRows = events.filter((event) => event.event_type === 'claim')
+
+      setFunnel({
+        views: uniqueVisitors(viewRows),
+        clickUnique: uniqueVisitors(clickRows),
+        clickTotal: clickRows.length,
+        claims: uniqueVisitors(claimRows),
+        purchases: txData.length,
+      })
+
+      const influencerIds = [...new Set(
+        [
+          ...events.map((event) => event.influencer_id),
+          ...txData.map((tx) => tx.influencer_id),
+          ...partnerships.map((partnership) => partnership.influencer_id),
+        ].filter(Boolean)
+      )]
+
+      let profiles: any[] = []
+      if (influencerIds.length > 0) {
+        const { data } = await supabase.from('profiles').select('id, full_name').in('id', influencerIds)
+        profiles = data || []
+      }
       const profileMap: Record<string, string> = {}
-      profiles?.forEach(p => { profileMap[p.id] = p.full_name || 'Anonymous Node' })
+      profiles.forEach((profile) => { profileMap[profile.id] = profile.full_name || 'Anonymous Node' })
 
-      if (txData && txData.length > 0) {
+      if (txData.length > 0) {
         let totalNetRev = 0
-        let totalSales = txData.length
-
-        const monthlyData: Record<string, { month: string, revenue: number, sales: number, loyalty: number }> = {}
-        const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-        const infMap: Record<string, { id: string, revenue: number, sales: number }> = {}
-
-        txData.forEach(tx => {
-          const netAmt = tx.brand_earned || 0 
-          totalNetRev += netAmt
-
-          const dateObj = new Date(tx.created_at)
-          const monthStr = monthNames[dateObj.getMonth()]
-          
-          if (!monthlyData[monthStr]) {
-            monthlyData[monthStr] = { month: monthStr, revenue: 0, sales: 0, loyalty: (Math.random() * 2 + 1.5) } 
-          }
-          monthlyData[monthStr].revenue += netAmt
-          monthlyData[monthStr].sales += 1
-
-          const infId = tx.influencer_id
-          if (infId) {
-            if (!infMap[infId]) infMap[infId] = { id: infId, revenue: 0, sales: 0 }
-            infMap[infId].revenue += netAmt
-            infMap[infId].sales += 1
-          }
-        })
-
+        txData.forEach((tx) => { totalNetRev += tx.brand_earned || 0 })
         setMetrics({
           revenue: totalNetRev,
-          sales: totalSales,
-          loyalty: (totalSales > 10 ? '3.2x' : '1.5x') 
+          sales: txData.length,
+          loyalty: (txData.length > 10 ? '3.2x' : '1.5x'),
         })
-
-        setChartData(Object.values(monthlyData))
-
-        const formattedInfluencers = Object.values(infMap)
-          .map(inf => ({
-            name: profileMap[inf.id] || `NODE_${inf.id.substring(0, 5).toUpperCase()}`,
-            token: `$INFLUX`, 
-            revenue: inf.revenue,
-            sales: inf.sales,
-            loyalty: (inf.sales > 5 ? '3.4x' : '2.1x')
-          }))
-          .sort((a, b) => b.revenue - a.revenue)
-
-        setInfluencerNodes(formattedInfluencers)
       } else {
         setMetrics({ revenue: 0, sales: 0, loyalty: '0.0x' })
-        setChartData([{ month: 'JAN', revenue: 0, sales: 0, loyalty: 0 }])
       }
+
+      const buckets = new Map<string, { views: Set<string>; clickVisitors: Set<string>; clicks: number; claims: Set<string>; purchases: number; revenue: number }>()
+      const ensure = (influencerId: string) => {
+        if (!buckets.has(influencerId)) {
+          buckets.set(influencerId, { views: new Set(), clickVisitors: new Set(), clicks: 0, claims: new Set(), purchases: 0, revenue: 0 })
+        }
+        return buckets.get(influencerId)!
+      }
+
+      partnerships.forEach((partnership) => {
+        if (partnership.influencer_id) ensure(partnership.influencer_id)
+      })
+      events.forEach((event) => {
+        if (!event.influencer_id) return
+        const bucket = ensure(event.influencer_id)
+        const visitor = event.visitor_id || event.id
+        if (event.event_type === 'view') bucket.views.add(visitor)
+        if (event.event_type === 'deal_click') {
+          bucket.clicks += 1
+          bucket.clickVisitors.add(visitor)
+        }
+        if (event.event_type === 'claim') bucket.claims.add(visitor)
+      })
+      txData.forEach((tx) => {
+        if (!tx.influencer_id) return
+        const bucket = ensure(tx.influencer_id)
+        bucket.purchases += 1
+        bucket.revenue += Number(tx.brand_earned) || 0
+      })
+
+      setInfluencerRows([...buckets.entries()].map(([influencerId, bucket]) => ({
+        id: influencerId,
+        name: profileMap[influencerId] || `NODE_${influencerId.substring(0, 5).toUpperCase()}`,
+        views: bucket.views.size,
+        uniqueClicks: bucket.clickVisitors.size,
+        totalClicks: bucket.clicks,
+        claims: bucket.claims.size,
+        purchases: bucket.purchases,
+        revenue: bucket.revenue,
+      })).sort((a, b) => b.revenue - a.revenue || b.views - a.views))
+
       setLoading(false)
     }
 
     fetchAnalytics()
   }, [])
+
+  const stages = [
+    { label: 'Token Views', value: funnel.views, detail: 'Unique people' },
+    { label: 'Brand Deal Clicks', value: funnel.clickUnique, detail: `${funnel.clickTotal} clicks · ${percent(funnel.clickUnique, funnel.views)}% of views` },
+    { label: 'Token Claims', value: funnel.claims, detail: `${percent(funnel.claims, funnel.views)}% of views` },
+    { label: 'Completed Purchases', value: funnel.purchases, detail: `${percent(funnel.purchases, funnel.claims)}% of claims` },
+  ]
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-blue-500 font-black animate-pulse uppercase italic text-xs tracking-widest">Compiling Matrix...</div>
 
@@ -111,23 +217,50 @@ export default function AnalyticsPage() {
         </div>
       </header>
 
-      <div className="space-y-10">
-        <span className="text-[10px] text-gray-600 tracking-[0.5em] px-8">Influencer Performance (Net Yield)</span>
-        <div className="grid grid-cols-1 gap-8">
-          {influencerNodes.map((inf, i) => (
-            <div key={i} className="bg-[#010201] border border-white/5 rounded-[45px] p-10 flex flex-col lg:grid lg:grid-cols-4 items-center gap-12 hover:border-blue-500/30 transition-all">
-              <div className="col-span-1 flex items-center gap-6 w-full">
-                <div className="h-16 w-16 rounded-[24px] bg-white/[0.03] border border-white/10 flex items-center justify-center text-3xl">🤖</div>
-                <div>
-                  <h4 className="text-xl text-white leading-none">{inf.name}</h4>
-                  <p className="text-[10px] text-blue-500 mt-2">{inf.token}</p>
-                </div>
-              </div>
-              <div className="col-span-1"><span className="text-[8px] text-gray-700 block mb-2">Your Net</span><p className="text-3xl">{inf.revenue.toLocaleString()} ₾</p></div>
-              <div className="col-span-1"><span className="text-[8px] text-gray-700 block mb-2">Units Sold</span><p className="text-3xl">{inf.sales}</p></div>
-              <div className="col-span-1"><span className="text-[8px] text-emerald-500 block mb-2">Loyalty</span><p className="text-3xl text-emerald-400">{inf.loyalty}</p></div>
+      <section className="space-y-6">
+        <span className="text-[10px] text-gray-600 tracking-[0.5em] px-2">Token Funnel</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {stages.map((stage) => (
+            <div key={stage.label} className="bg-[#010201] border border-white/5 rounded-[32px] p-6">
+              <span className="text-[8px] text-gray-600 tracking-[0.2em] block mb-3">{stage.label}</span>
+              <p className="text-4xl tracking-tighter">{stage.value}</p>
+              <p className="text-[8px] text-blue-400/80 mt-3 tracking-[0.12em] normal-case">{stage.detail}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <div className="space-y-10">
+        <span className="text-[10px] text-gray-600 tracking-[0.5em] px-2">Per-Influencer Breakdown</span>
+        <div className="bg-[#010201] border border-white/5 rounded-[45px] overflow-x-auto">
+          <table className="w-full min-w-[860px] text-left">
+            <thead>
+              <tr className="text-[8px] text-gray-600 tracking-[0.3em] border-b border-white/5">
+                <th className="px-8 py-5 font-black">Influencer Name</th>
+                <th className="px-6 py-5 font-black">Views</th>
+                <th className="px-6 py-5 font-black">Deal Clicks</th>
+                <th className="px-6 py-5 font-black">Claims</th>
+                <th className="px-6 py-5 font-black">Purchases</th>
+                <th className="px-8 py-5 font-black text-right">Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {influencerRows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-8 py-10 text-[10px] text-gray-600 tracking-[0.3em]">No influencer signal yet</td>
+                </tr>
+              ) : influencerRows.map((inf) => (
+                <tr key={inf.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                  <td className="px-8 py-6 text-lg text-white">{inf.name}</td>
+                  <td className="px-6 py-6">{inf.views}</td>
+                  <td className="px-6 py-6">{inf.uniqueClicks} <span className="text-[10px] text-gray-600">unique</span> · {inf.totalClicks}</td>
+                  <td className="px-6 py-6">{inf.claims}</td>
+                  <td className="px-6 py-6">{inf.purchases}</td>
+                  <td className="px-8 py-6 text-right">{money(inf.revenue)} ₾</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
