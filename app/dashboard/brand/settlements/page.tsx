@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 
 export default function BillingLedgerPage() {
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ gross: 0, net: 0, fees: 0 })
+  const [stats, setStats] = useState({ gross: 0, net: 0, influencer: 0, fees: 0 })
   const [ledgerHistory, setLedgerHistory] = useState<any[]>([])
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export default function BillingLedgerPage() {
       // 2. მოგვაქვს ბრენდის ტრანზაქციები
       const { data: txData } = await supabase
         .from('transactions')
-        .select('id, amount, final_amount, created_at, influencer_id')
+        .select('id, final_amount, brand_earned, influencer_earned, system_fee, payout_status, created_at, influencer_id')
         .eq('brand_id', user.id)
         .in('status', ['approved', 'success'])
         .order('created_at', { ascending: false })
@@ -30,16 +30,19 @@ export default function BillingLedgerPage() {
       if (txData && txData.length > 0) {
         let totalGross = 0
         let totalNet = 0
+        let totalInfluencer = 0
         let totalFees = 0
 
         const formattedHistory = txData.map(tx => {
-          const clientPaid = tx.final_amount || 0
-          // 🧮 Instant Split სიმულაცია: ბრენდს რჩება 90%, 10% მიდის ინფლუენსერზე/სისტემაზე
-          const systemFee = clientPaid * 0.10
-          const brandNet = clientPaid - systemFee
+          const clientPaid = Number(tx.final_amount) || 0
+          const brandNet = Number(tx.brand_earned) || 0
+          const influencerEarned = Number(tx.influencer_earned) || 0
+          const systemFee = Number(tx.system_fee) || 0
+          const nodeName = tx.influencer_id ? (profileMap[tx.influencer_id] || 'ANON') : 'ORGANIC TRAFFIC'
 
           totalGross += clientPaid
           totalNet += brandNet
+          totalInfluencer += influencerEarned
           totalFees += systemFee
 
           return {
@@ -47,15 +50,17 @@ export default function BillingLedgerPage() {
             date: new Date(tx.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
             clientPaid,
             brandNet,
+            influencerEarned,
             systemFee,
-            node: tx.influencer_id ? `${profileMap[tx.influencer_id].replace(/\s+/g, '_').toUpperCase()}` : 'ORGANIC_TRAFFIC'
+            payoutStatus: tx.payout_status || '—',
+            node: nodeName.replace(/\s+/g, '_').toUpperCase()
           }
         })
 
-        setStats({ gross: totalGross, net: totalNet, fees: totalFees })
+        setStats({ gross: totalGross, net: totalNet, influencer: totalInfluencer, fees: totalFees })
         setLedgerHistory(formattedHistory)
       } else {
-        setStats({ gross: 0, net: 0, fees: 0 })
+        setStats({ gross: 0, net: 0, influencer: 0, fees: 0 })
         setLedgerHistory([])
       }
       
@@ -94,7 +99,7 @@ export default function BillingLedgerPage() {
               </p>
            </div>
            <div className="space-y-1">
-              <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest italic">Net Settled to Bank</span>
+              <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest italic">Brand Earned</span>
               <p className="text-3xl font-black italic tracking-tighter text-blue-500 leading-none">
                 {stats.net.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs opacity-30">₾</span>
               </p>
@@ -107,11 +112,11 @@ export default function BillingLedgerPage() {
          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
          
          <div className="space-y-4 text-center md:text-left z-10">
-            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.5em] italic">Ecosystem Fees Automatically Deducted</span>
+            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.5em] italic">Stored Split</span>
             <h2 className="text-6xl font-black italic tracking-tighter text-white">
               {stats.fees.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xl opacity-20 italic">GEL</span>
             </h2>
-            <p className="text-xs font-black text-gray-600 uppercase tracking-widest italic">Total Platform & Influencer Splits Distributed</p>
+            <p className="text-xs font-black text-gray-600 uppercase tracking-widest italic">System fee · Influencer earned {stats.influencer.toLocaleString(undefined, { minimumFractionDigits: 2 })} ₾</p>
          </div>
 
          <div className="flex flex-col gap-4 w-full md:w-auto z-10">
@@ -129,12 +134,14 @@ export default function BillingLedgerPage() {
         <span className="text-[10px] font-black text-gray-600 uppercase tracking-[0.5em] italic px-8">Settlement History</span>
         
         <div className="space-y-4">
-          <div className="grid grid-cols-5 px-12 text-[8px] font-black text-gray-700 uppercase tracking-[0.4em] italic mb-2">
+          <div className="hidden md:grid md:grid-cols-7 px-8 text-[8px] font-black text-gray-700 uppercase tracking-[0.28em] italic mb-2">
              <div>Ledger ID</div>
-             <div className="text-center">Origin Node</div>
-             <div className="text-center">Date</div>
-             <div className="text-center text-gray-500">Gross Vol.</div>
-             <div className="text-right text-blue-500">Net Deposit</div>
+             <div>Origin</div>
+             <div>Date</div>
+             <div>Paid</div>
+             <div className="text-blue-500">Brand</div>
+             <div>Influencer</div>
+             <div className="text-right">Fee / Payout</div>
           </div>
 
           {ledgerHistory.length === 0 ? (
@@ -149,32 +156,37 @@ export default function BillingLedgerPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  className="bg-white/[0.02] border border-white/5 rounded-[35px] p-8 grid grid-cols-5 items-center hover:border-white/20 transition-all group"
+                  className="bg-white/[0.02] border border-white/5 rounded-[35px] p-6 md:p-8 grid grid-cols-2 md:grid-cols-7 items-center gap-3 hover:border-white/20 transition-all group"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
                     <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6]" />
-                    <p className="text-[11px] font-black italic text-white uppercase">{inv.id}</p>
+                    <div>
+                      <p className="text-[11px] font-black italic text-white uppercase">{inv.id}</p>
+                      <p className="text-[10px] font-black italic text-gray-500 uppercase md:hidden">{inv.date}</p>
+                    </div>
                   </div>
-                  
-                  <div className="text-center">
+                  <div>
                     <span className="text-[9px] font-black text-blue-500 italic tracking-widest uppercase">{inv.node}</span>
                   </div>
-
-                  <div className="text-center font-sans">
+                  <div className="hidden md:block font-sans">
                     <p className="text-xs font-black italic text-gray-500 uppercase">{inv.date}</p>
                   </div>
-
-                  <div className="text-center flex flex-col items-center">
-                     <p className="text-md font-black italic text-gray-400 leading-none">
-                       {inv.clientPaid.toFixed(2)}
-                     </p>
+                  <div>
+                     <p className="text-[8px] text-gray-600 uppercase tracking-widest md:hidden">Paid</p>
+                     <p className="text-sm font-black italic text-gray-300">{inv.clientPaid.toFixed(2)}</p>
                   </div>
-
-                  <div className="text-right flex flex-col items-end gap-1">
-                     <p className="text-xl font-black italic text-white leading-none">
-                       {inv.brandNet.toFixed(2)} <span className="text-[9px] opacity-20 italic">₾</span>
-                     </p>
-                     <span className="text-[7px] font-black text-emerald-500 uppercase tracking-widest italic">SETTLED</span>
+                  <div>
+                     <p className="text-[8px] text-gray-600 uppercase tracking-widest md:hidden">Brand</p>
+                     <p className="text-sm font-black italic text-white">{inv.brandNet.toFixed(2)}</p>
+                  </div>
+                  <div>
+                     <p className="text-[8px] text-gray-600 uppercase tracking-widest md:hidden">Influencer</p>
+                     <p className="text-sm font-black italic text-white/80">{inv.influencerEarned.toFixed(2)}</p>
+                  </div>
+                  <div className="text-left md:text-right">
+                     <p className="text-[8px] text-gray-600 uppercase tracking-widest md:hidden">Fee / payout</p>
+                     <p className="text-sm font-black italic text-white/70">{inv.systemFee.toFixed(2)}</p>
+                     <span className="text-[7px] font-black text-emerald-500 uppercase tracking-widest italic">{inv.payoutStatus}</span>
                   </div>
                 </motion.div>
               ))}

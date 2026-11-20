@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { maskGeorgianPhone } from '@/lib/phone'
+import { verifyBogTransaction } from '@/lib/verifyBogTransaction'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -23,7 +25,7 @@ async function findTransaction(supabase: ReturnType<typeof adminClient>, id: str
     throw new Error(byId.error.message)
   }
 
-  for (const column of ['external_order_id', 'order_id', 'reference']) {
+  for (const column of ['bog_order_id', 'external_order_id', 'order_id', 'reference']) {
     const attempt = await supabase.from('transactions').select('*').eq(column, id).maybeSingle()
     if (attempt.data) return attempt.data
     if (attempt.error && !missingColumn(attempt.error.message) && !/invalid input syntax/i.test(attempt.error.message || '')) {
@@ -42,63 +44,40 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url)
     const id = url.searchParams.get('id') || url.searchParams.get('txid') || url.searchParams.get('tx')
-    if (!id) {
-      return NextResponse.json({ error: 'Transaction id is required' }, { status: 400 })
-    }
+    if (!id) return NextResponse.json({ error: 'Transaction id is required' }, { status: 400 })
 
     const supabase = adminClient()
-    const tx = await findTransaction(supabase, id)
-    if (!tx) {
-      return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+    let tx = await findTransaction(supabase, id)
+    if (!tx) return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+
+    if (tx.status === 'pending' && tx.bog_order_id) {
+      try {
+        await verifyBogTransaction(supabase, tx)
+        const refreshed = await findTransaction(supabase, String(tx.id))
+        if (refreshed) tx = refreshed
+      } catch (healError: any) {
+        console.error('BOG self-heal failed:', healError?.message || healError)
+      }
     }
 
     const dealQuery = tx.deal_id
-      ? await supabase
-          .from('deals')
-          .select('title, gift_description, gift_threshold, gift_image_url, logo')
-          .eq('id', tx.deal_id)
-          .maybeSingle()
+      ? await supabase.from('deals').select('title, delivery_estimate').eq('id', tx.deal_id).maybeSingle()
       : { data: null }
 
     const brandQuery = tx.brand_id
-      ? await supabase
-          .from('profiles')
-          .select('full_name, avatar_url')
-          .eq('id', tx.brand_id)
-          .maybeSingle()
+      ? await supabase.from('profiles').select('full_name').eq('id', tx.brand_id).maybeSingle()
       : { data: null }
 
-    const amount = Number(tx.bill_amount ?? tx.amount ?? 0)
-    const finalAmount = Number(tx.final_amount ?? 0)
-
     return NextResponse.json({
-      transaction: {
-        id: tx.id,
-        amount,
-        final_amount: finalAmount,
-        bill_amount: amount,
-        discount_percent: tx.discount_percent ?? null,
-        status: tx.status ?? null,
-        created_at: tx.created_at ?? null,
-        gift_unlocked: Boolean(tx.gift_unlocked),
-        gift_description: tx.gift_description || null,
-        customer_phone: tx.customer_phone || null,
-      },
-      deal: dealQuery.data
-        ? {
-            title: dealQuery.data.title || null,
-            gift_description: dealQuery.data.gift_description || null,
-            gift_threshold: Number(dealQuery.data.gift_threshold || 0),
-            gift_image_url: dealQuery.data.gift_image_url || null,
-            logo: dealQuery.data.logo || null,
-          }
-        : null,
-      brand: brandQuery.data
-        ? {
-            full_name: brandQuery.data.full_name || null,
-            avatar_url: brandQuery.data.avatar_url || null,
-          }
-        : null,
+      id: tx.id,
+      status: tx.status ?? null,
+      final_amount: Number(tx.final_amount || 0),
+      deal_title: dealQuery.data?.title || null,
+      brand_name: brandQuery.data?.full_name || null,
+      gift_description: tx.gift_description || null,
+      delivery_estimate: dealQuery.data?.delivery_estimate || null,
+      customer_city: tx.customer_city || null,
+      customer_phone: tx.customer_phone ? maskGeorgianPhone(tx.customer_phone) : null,
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Receipt lookup failed' }, { status: 500 })

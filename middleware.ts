@@ -33,8 +33,8 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // 🔓 1. გამონაკლისი: /wallet და /claim გვერდებზე ყველას ვუშვებთ უპირობოდ
-  if (pathname.startsWith('/wallet') || pathname.startsWith('/claim')) {
+  // 🔓 1. გამონაკლისი: /claim გვერდზე ყველას ვუშვებთ უპირობოდ
+  if (pathname.startsWith('/claim')) {
     return response
   }
 

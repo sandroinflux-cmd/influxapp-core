@@ -21,7 +21,7 @@ export default async function NodeInspector(props: any) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/')
   const { data: adminProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (adminProfile?.role !== 'superadmin') redirect('/wallet')
+  if (adminProfile?.role !== 'superadmin') redirect('/')
 
   // 👤 იუზერის მონაცემები
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', targetId).single()

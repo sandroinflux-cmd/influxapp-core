@@ -1,5 +1,5 @@
-export type TokenEventType = 'view' | 'flip' | 'deal_click' | 'claim'
-export type TokenEventSource = 'claim' | 'wallet'
+export type TokenEventType = 'view' | 'flip' | 'deal_click' | 'claim' | 'checkout_view' | 'payment_init'
+export type TokenEventSource = 'claim' | 'wallet' | 'checkout'
 
 export type TrackTokenPayload = {
   influencerId: string

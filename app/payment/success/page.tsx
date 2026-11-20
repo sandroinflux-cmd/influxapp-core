@@ -1,413 +1,211 @@
 'use client'
 
-import { useEffect, useRef, useState, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
-import ReceiptModal from '@/components/ReceiptModal'
+import { ReactNode, Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 
-function PhoneLinkForm({
-  transactionId,
-  savedPhone,
-  onSaved,
-  submitLabel = 'Confirm & Link Order',
-}: {
-  transactionId: string
-  savedPhone: string | null
-  onSaved: (phone: string) => void
-  submitLabel?: string
-}) {
-  const [phone, setPhone] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  if (savedPhone) {
-    return (
-      <div className="w-full rounded-[22px] border border-emerald-400/40 bg-emerald-500/10 px-4 py-4 text-center normal-case not-italic">
-        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-emerald-300">Phone Linked ✓</p>
-        <p className="mt-1 text-sm font-bold text-white tracking-widest">{savedPhone}</p>
-      </div>
-    )
-  }
-
-  const submit = async () => {
-    setSaving(true)
-    setError(null)
-    try {
-      const response = await fetch('/api/payments/customer-phone', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactionId, phone }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || 'Could not link this phone number.')
-      onSaved(data.customer_phone || phone.trim())
-    } catch (err: any) {
-      setError(err.message || 'Could not link this phone number.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="w-full space-y-3 normal-case not-italic font-sans">
-      <input
-        type="tel"
-        value={phone}
-        onChange={(event) => setPhone(event.target.value)}
-        placeholder="+995 5XX XX XX XX"
-        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-center text-base font-bold text-white outline-none focus:border-emerald-400/60"
-      />
-      {error && <p className="text-[11px] font-bold text-red-400 text-center">{error}</p>}
-      <button
-        onClick={submit}
-        disabled={saving || !phone.trim()}
-        className="w-full bg-emerald-500 text-black py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.22em] italic hover:bg-emerald-400 disabled:opacity-40 transition-all"
-      >
-        {saving ? 'Linking...' : submitLabel}
-      </button>
-    </div>
-  )
+type Receipt = {
+  id: string
+  status: string | null
+  final_amount: number
+  deal_title: string | null
+  brand_name: string | null
+  gift_description: string | null
+  delivery_estimate: string | null
+  customer_city: string | null
+  customer_phone: string | null
 }
 
-function ModalPhoneForm({
-  transactionId,
-  submitLabel,
-  onSaved,
-}: {
-  transactionId: string
-  submitLabel: string
-  onSaved: (phone: string) => void
-}) {
-  const [phone, setPhone] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+function shortOrderId(id: string) {
+  return id.replace(/-/g, '').slice(0, 8).toUpperCase()
+}
 
-  const submit = async () => {
-    if (!phone.trim()) {
-      setError('Enter a phone number to link this order.')
-      return
-    }
-    setSaving(true)
-    setError(null)
-    try {
-      const response = await fetch('/api/payments/customer-phone', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactionId, phone }),
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || 'Enter a valid phone number, like +995 5XX XX XX XX.')
-      onSaved(data.customer_phone || phone.trim())
-    } catch (err: any) {
-      setError(err.message || 'Enter a valid phone number, like +995 5XX XX XX XX.')
-    } finally {
-      setSaving(false)
-    }
-  }
+function formatGel(value: number) {
+  if (!Number.isFinite(value)) return '0.00'
+  return Number.isInteger(value) ? String(value) : value.toFixed(2)
+}
 
+function whatsappHref(orderId: string) {
+  const text = `გამარჯობა, შეკვეთა #${shortOrderId(orderId)}`
+  return `https://wa.me/995500050608?text=${encodeURIComponent(text)}`
+}
+
+function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="w-full space-y-3 normal-case not-italic font-sans">
-      <input
-        type="tel"
-        inputMode="tel"
-        autoComplete="tel"
-        value={phone}
-        onChange={(event) => setPhone(event.target.value)}
-        placeholder="+995 5XX XX XX XX"
-        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-4 text-center text-base font-bold text-white outline-none focus:border-emerald-400/60"
-      />
-      {error && <p className="text-[11px] font-bold text-red-400 text-center">{error}</p>}
-      <button
-        onClick={submit}
-        disabled={saving}
-        className="w-full bg-emerald-500 text-black py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.22em] italic hover:bg-emerald-400 disabled:opacity-40 transition-all"
-      >
-        {saving ? 'Saving...' : submitLabel}
-      </button>
-    </div>
+    <main className="flex min-h-screen items-center justify-center bg-[#010201] px-5 py-10 text-white">
+      <div className="w-full max-w-md">{children}</div>
+    </main>
   )
 }
 
 function SuccessContent() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const txId = searchParams.get('txid') || searchParams.get('id') || searchParams.get('tx')
-  const promptStarted = useRef(false)
-  const closeTimer = useRef<number | null>(null)
-
-  const [txData, setTxData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [captureOpen, setCaptureOpen] = useState(false)
-  const [savedPhone, setSavedPhone] = useState<string | null>(null)
-  const [confirmState, setConfirmState] = useState<'order' | 'saved' | null>(null)
+  const [receipt, setReceipt] = useState<Receipt | null>(null)
+  const [phase, setPhase] = useState<'checking' | 'approved' | 'rejected' | 'timeout' | 'missing' | 'error'>('checking')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    promptStarted.current = false
-    setCaptureOpen(false)
-    setConfirmState(null)
-    if (txId) {
-      fetchTransactionDetails()
-    } else {
-      setErrorMsg('URL ERROR: txid is missing.')
-      setLoading(false)
+    if (!txId) {
+      setPhase('missing')
+      return
     }
+
+    let stopped = false
+    const started = Date.now()
+    let timer = 0
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/payments/receipt?id=${encodeURIComponent(txId)}`, { cache: 'no-store' })
+        const data = await response.json().catch(() => ({}))
+        if (stopped) return
+        if (!response.ok) throw new Error(data.error || 'შეკვეთა ვერ მოიძებნა')
+
+        setReceipt(data)
+        if (data.status === 'approved') {
+          setPhase('approved')
+          return
+        }
+        if (data.status === 'rejected') {
+          setPhase('rejected')
+          return
+        }
+        if (Date.now() - started >= 14000) {
+          setPhase('timeout')
+          return
+        }
+        timer = window.setTimeout(poll, 2000)
+      } catch (err: any) {
+        if (stopped) return
+        setError(err?.message || 'შეკვეთა ვერ მოიძებნა')
+        setPhase('error')
+      }
+    }
+
+    poll()
     return () => {
-      if (closeTimer.current) window.clearTimeout(closeTimer.current)
+      stopped = true
+      window.clearTimeout(timer)
     }
   }, [txId])
 
-  useEffect(() => {
-    if (!captureOpen || !txData?.gift_unlocked) return
-    const blockEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      event.stopPropagation()
-    }
-    window.addEventListener('keydown', blockEscape)
-    return () => window.removeEventListener('keydown', blockEscape)
-  }, [captureOpen, txData?.gift_unlocked])
-
-  useEffect(() => {
-    if (!captureOpen || txData?.gift_unlocked) return
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      if (closeTimer.current) window.clearTimeout(closeTimer.current)
-      setCaptureOpen(false)
-    }
-    window.addEventListener('keydown', onEscape)
-    return () => window.removeEventListener('keydown', onEscape)
-  }, [captureOpen, txData?.gift_unlocked])
-
-  const fetchTransactionDetails = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/payments/receipt?id=${encodeURIComponent(txId || '')}`)
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || 'Transaction not found')
-
-      const tx = data.transaction
-      const dealData = data.deal
-      const brand = data.brand
-      const mergedDeal = {
-        ...dealData,
-        brand: dealData?.title || brand?.full_name || 'MATRIX PARTNER',
-        logo: brand?.avatar_url || dealData?.logo || '💎',
-        title: dealData?.title || brand?.full_name || 'MATRIX PARTNER',
-      }
-
-      const nextTx = { ...tx, deals: mergedDeal, deal: dealData, brand }
-      const existingPhone = typeof tx.customer_phone === 'string' ? tx.customer_phone.trim() : ''
-      setTxData(nextTx)
-      setSavedPhone(existingPhone || null)
-      if (!existingPhone && !promptStarted.current) {
-        promptStarted.current = true
-        setCaptureOpen(true)
-      }
-
-      const savedHistory = JSON.parse(localStorage.getItem('matrix_user_transactions') || '[]')
-      if (!savedHistory.find((item: any) => item.id === tx.id)) {
-        savedHistory.unshift({
-          id: tx.id,
-          brandName: mergedDeal.brand,
-          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          paid: tx.final_amount,
-          saved: Number(tx.bill_amount || tx.amount || 0) - Number(tx.final_amount || 0),
-        })
-        localStorage.setItem('matrix_user_transactions', JSON.stringify(savedHistory.slice(0, 15)))
-      }
-    } catch (err: any) {
-      setErrorMsg(`DATABASE ERROR: ${err.message || JSON.stringify(err)}`)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (errorMsg) {
+  if (phase === 'checking') {
     return (
-      <div className="min-h-screen bg-[#010201] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 border border-red-500/20 rounded-full flex items-center justify-center mb-6">
-          <span className="text-red-500 text-2xl">!</span>
+      <Shell>
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-2 border-emerald-500/20 border-t-emerald-400" />
+          <p className="text-base font-semibold">გადახდა მოწმდება...</p>
         </div>
-        <p className="text-red-500 font-black uppercase tracking-widest mb-2 italic text-sm">System Error X-Ray</p>
-        <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-lg mb-8 max-w-md w-full">
-          <p className="text-red-400 text-[10px] font-mono break-words lowercase">{errorMsg}</p>
-        </div>
-        <button
-          onClick={() => router.push('/wallet')}
-          className="px-10 py-3 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition-all italic"
-        >
-          [ Return to Base ]
-        </button>
-      </div>
+      </Shell>
     )
   }
 
-  const giftImage = txData?.deal?.gift_image_url
-  const giftImageIsUrl = typeof giftImage === 'string' && giftImage.startsWith('http')
-  const giftCopy = txData?.gift_description || txData?.deal?.gift_description
-  const giftRequired = Boolean(txData?.gift_unlocked)
-
-  const closeCapture = () => {
-    if (giftRequired) return
-    if (closeTimer.current) window.clearTimeout(closeTimer.current)
-    setCaptureOpen(false)
+  if (phase === 'missing' || phase === 'error') {
+    return (
+      <Shell>
+        <div className="space-y-3 text-center">
+          <h1 className="text-2xl font-black">შეკვეთა ვერ მოიძებნა</h1>
+          <p className="text-sm text-white/60">{error || 'Order reference is missing.'}</p>
+          <Link href="/" className="inline-block pt-2 text-sm font-bold text-emerald-300">
+            მთავარზე
+          </Link>
+        </div>
+      </Shell>
+    )
   }
 
-  const revealReceipt = () => {
-    if (closeTimer.current) window.clearTimeout(closeTimer.current)
-    setCaptureOpen(false)
+  if (phase === 'rejected') {
+    return (
+      <Shell>
+        <div className="rounded-[28px] border border-red-400/30 bg-red-500/10 px-6 py-8 text-center">
+          <h1 className="text-2xl font-black">გადახდა ვერ შესრულდა</h1>
+          <p className="mt-2 text-sm text-white/70">Payment was not confirmed.</p>
+          {receipt?.id && (
+            <p className="mt-4 text-xs tracking-widest text-white/50">#{shortOrderId(receipt.id)}</p>
+          )}
+        </div>
+      </Shell>
+    )
   }
 
-  const handlePhoneSaved = (phone: string) => {
-    setSavedPhone(phone)
-    setTxData((current: any) => current ? { ...current, customer_phone: phone } : current)
-    setConfirmState(giftRequired ? 'order' : 'saved')
-    if (closeTimer.current) window.clearTimeout(closeTimer.current)
-    closeTimer.current = window.setTimeout(() => setCaptureOpen(false), giftRequired ? 900 : 800)
+  if (phase === 'timeout') {
+    return (
+      <Shell>
+        <div className="space-y-4 text-center">
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-emerald-500/20 border-t-emerald-400" />
+          <h1 className="text-xl font-black">გადახდა მოწმდება...</h1>
+          <p className="text-sm text-white/60">დადასტურებას ცოტა მეტი დრო სჭირდება. განაახლე გვერდი რამდენიმე წამში.</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="w-full rounded-2xl bg-white py-4 text-sm font-black text-black"
+          >
+            განახლება
+          </button>
+        </div>
+      </Shell>
+    )
   }
+
+  const orderId = receipt?.id || txId || ''
 
   return (
-    <div className="min-h-screen bg-[#010201] flex flex-col items-center justify-center p-6 text-white italic font-black uppercase">
-      {txData && (
-        <ReceiptModal
-          total={txData.final_amount}
-          originalAmount={txData.bill_amount || txData.amount}
-          deal={txData.deals}
-          giftUnlocked={Boolean(txData.gift_unlocked)}
-          giftDescription={giftCopy}
-          obscured={captureOpen && giftRequired}
-          onDone={() => router.push('/wallet')}
-          footer={
-            <div className="mt-2 rounded-[28px] border border-white/10 bg-white/[0.03] p-4 normal-case not-italic">
-              {!savedPhone && (
-                <p className="text-[9px] font-black uppercase tracking-[0.28em] text-emerald-300/80 italic text-center mb-3">
-                  Link your phone to this order
-                </p>
-              )}
-              <PhoneLinkForm
-                transactionId={txData.id}
-                savedPhone={savedPhone}
-                onSaved={(phone) => {
-                  setSavedPhone(phone)
-                  setTxData((current: any) => current ? { ...current, customer_phone: phone } : current)
-                }}
-              />
+    <Shell>
+      <div className="rounded-[28px] border border-emerald-400/25 bg-emerald-500/10 px-6 py-7">
+        <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300">დადასტურებულია</p>
+        <h1 className="mt-2 text-3xl font-black">შეკვეთა მიღებულია</h1>
+        <p className="mt-2 text-sm text-white/60">Order #{shortOrderId(orderId)}</p>
+
+        <dl className="mt-6 space-y-3 text-sm">
+          <div className="flex items-start justify-between gap-4">
+            <dt className="text-white/50">ბრენდი</dt>
+            <dd className="text-right font-bold">{receipt?.brand_name || '—'}</dd>
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <dt className="text-white/50">ბანდლი</dt>
+            <dd className="text-right font-bold">{receipt?.deal_title || '—'}</dd>
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <dt className="text-white/50">გადახდილი</dt>
+            <dd className="text-right font-black">{formatGel(Number(receipt?.final_amount || 0))} ₾</dd>
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <dt className="text-white/50">საჩუქარი</dt>
+            <dd className="text-right font-bold">{receipt?.gift_description || '—'}</dd>
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <dt className="text-white/50">მიტანა</dt>
+            <dd className="text-right font-bold">{receipt?.delivery_estimate || '—'}</dd>
+          </div>
+          {receipt?.customer_city && (
+            <div className="flex items-start justify-between gap-4">
+              <dt className="text-white/50">ქალაქი</dt>
+              <dd className="text-right font-bold">{receipt.customer_city}</dd>
             </div>
-          }
-        />
-      )}
+          )}
+          {receipt?.customer_phone && (
+            <div className="flex items-start justify-between gap-4">
+              <dt className="text-white/50">ტელეფონი</dt>
+              <dd className="text-right font-bold tracking-wider">{receipt.customer_phone}</dd>
+            </div>
+          )}
+        </dl>
 
-      <AnimatePresence>
-        {captureOpen && txData && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => { if (!giftRequired) closeCapture() }}
-            className="fixed inset-0 z-[500] bg-black/75 backdrop-blur-sm flex items-center justify-center p-6"
-          >
-            <motion.div
-              initial={{ scale: 0.92, y: 16, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              onClick={(event) => event.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-              className={`relative w-full max-w-[380px] max-h-[90vh] overflow-y-auto rounded-[32px] p-7 normal-case not-italic ${
-                giftRequired
-                  ? 'border border-amber-300/30 bg-[#07080c] shadow-[0_0_80px_rgba(251,191,36,0.18)]'
-                  : 'border border-emerald-400/25 bg-[#05080a] shadow-[0_0_70px_rgba(16,185,129,0.16)]'
-              }`}
-            >
-              {!giftRequired && (
-                <button
-                  onClick={closeCapture}
-                  aria-label="Close"
-                  className="absolute top-4 right-4 h-8 w-8 rounded-full border border-white/10 bg-white/5 text-white/50 hover:text-white"
-                >
-                  X
-                </button>
-              )}
-
-              {giftRequired ? (
-                <div className="flex flex-col items-center text-center">
-                  {giftImageIsUrl ? (
-                    <img src={giftImage} alt="gift" className="h-24 w-24 rounded-[28px] object-cover border border-white/10 shadow-[0_0_30px_rgba(251,191,36,0.25)]" />
-                  ) : (
-                    <div className="h-24 w-24 rounded-[28px] bg-amber-400/10 border border-amber-300/40 flex items-center justify-center text-4xl shadow-[0_0_30px_rgba(251,191,36,0.35)]">
-                      🎁
-                    </div>
-                  )}
-                  <h2 className="mt-5 text-xl font-black italic uppercase tracking-tight text-white">You unlocked a gift</h2>
-                  {giftCopy && <p className="mt-2 text-sm font-black text-amber-200 italic">{giftCopy}</p>}
-                  <p className="mt-3 text-[11px] font-bold leading-relaxed text-white/60">
-                    Your phone number is required so the store can match this payment and hand over the gift.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center text-center pr-6">
-                  <p className="text-[10px] font-black uppercase tracking-[0.35em] text-emerald-400">Join VIP / Giveaway List</p>
-                  <h2 className="mt-3 text-xl font-black italic uppercase tracking-tight text-white">Leave your number</h2>
-                  <p className="mt-3 text-[11px] font-bold leading-relaxed text-white/60">
-                    Get exclusive offers, bonuses, and giveaways from this brand.
-                  </p>
-                </div>
-              )}
-
-              <div className="mt-6">
-                {confirmState ? (
-                  <div className="space-y-3">
-                    <div className="rounded-[22px] border border-emerald-400/40 bg-emerald-500/10 px-4 py-4 text-center">
-                      <p className="text-[11px] font-black uppercase tracking-[0.28em] text-emerald-300">
-                        {confirmState === 'order' ? 'Order Linked ✓' : 'Number Saved ✓'}
-                      </p>
-                      <p className="mt-1 text-sm font-bold text-white tracking-widest">{savedPhone}</p>
-                    </div>
-                    {confirmState === 'order' && (
-                      <button
-                        onClick={revealReceipt}
-                        className="w-full bg-white text-black py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.22em] italic"
-                      >
-                        View Receipt Now
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <ModalPhoneForm
-                    transactionId={txData.id}
-                    submitLabel={giftRequired ? 'Confirm & Unlock Receipt' : 'Save Number'}
-                    onSaved={handlePhoneSaved}
-                  />
-                )}
-              </div>
-
-              {!giftRequired && !confirmState && (
-                <button
-                  onClick={closeCapture}
-                  className="mt-4 w-full py-3 rounded-2xl border border-white/10 text-[10px] font-black uppercase tracking-[0.28em] text-white/50 hover:text-white italic"
-                >
-                  Skip & View Receipt
-                </button>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {loading && (
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
-          <p className="text-[8px] animate-pulse tracking-[0.5em] text-emerald-500">Decrypting Transaction Intel...</p>
-        </div>
-      )}
-    </div>
+        <a
+          href={whatsappHref(orderId)}
+          className="mt-6 flex w-full items-center justify-center rounded-2xl bg-[#25D366] py-4 text-base font-black text-black"
+        >
+          WhatsApp მხარდაჭერა
+        </a>
+      </div>
+    </Shell>
   )
 }
 
 export default function PaymentSuccess() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-black" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[#010201]" />}>
       <SuccessContent />
     </Suspense>
   )

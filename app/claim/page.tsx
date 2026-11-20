@@ -1,204 +1,141 @@
 'use client'
 
 import { useEffect, useRef, useState, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { useSearchParams } from 'next/navigation'
 import InfluXCard from '@/components/InfluXCard'
 import { trackTokenEvent } from '@/lib/trackTokenEvent'
 
-function walletOwns(influencerId: string) {
-  try {
-    const existing = localStorage.getItem('matrix_user_wallet')
-    const wallet = existing ? JSON.parse(existing) : []
-    return Array.isArray(wallet) && wallet.some((token: any) => token?.profile?.id === influencerId)
-  } catch {
-    return false
-  }
+function priceOffPct(deal: any) {
+  const price = Number(deal?.price || 0)
+  const original = Number(deal?.original_price || 0)
+  return original > price ? Math.round((1 - price / original) * 100) : 0
+}
+
+function formatOffer(deal: any) {
+  const price = Number(deal?.price || 0)
+  const limit = Number(deal?.stock_limit || 0)
+  const sold = Number(deal?.stock_sold || 0)
+  const exhausted = deal?.is_active !== true || (limit > 0 && sold >= limit)
+  if (exhausted) return 'SOLD'
+  const off = priceOffPct(deal)
+  if (off > 0) return `${off}% OFF`
+  if (price > 0) return Number.isInteger(price) ? `${price}₾` : `${price.toFixed(2)}₾`
+  return 'PAY'
 }
 
 function ClaimContent() {
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const influencerId = searchParams.get('ref')
-  
+  const influencerRef = searchParams.get('ref')
+  const username = searchParams.get('username')
+
   const [profile, setProfile] = useState<any>(null)
   const [liveDeals, setLiveDeals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [owned, setOwned] = useState(false)
-  const [soldOut, setSoldOut] = useState(false)
-  const [claiming, setClaiming] = useState(false)
-  const [claimNote, setClaimNote] = useState<string | null>(null)
   const viewTracked = useRef(false)
-  const claimingRef = useRef(false)
 
   useEffect(() => {
-    if (!influencerId || viewTracked.current) return
-    viewTracked.current = true
-    trackTokenEvent({ influencerId, eventType: 'view', source: 'claim' })
-  }, [influencerId])
-
-  useEffect(() => {
-    if (influencerId) fetchData()
+    if (influencerRef || username) fetchData()
     else setLoading(false)
-  }, [influencerId])
+  }, [influencerRef, username])
 
   const fetchData = async () => {
     try {
-      let { data: prof, error: profError } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, token_limit, token_claims')
-        .eq('id', influencerId)
-        .single()
-      if (profError) {
-        const fallback = await supabase
-          .from('profiles')
-          .select('id, full_name, avatar_url')
-          .eq('id', influencerId)
-          .single()
-        prof = fallback.data as typeof prof
-      }
-      if (prof) setProfile(prof)
+      const params = new URLSearchParams()
+      if (influencerRef) params.set('ref', influencerRef)
+      else if (username) params.set('username', username)
 
-      const { data: dealsData } = await supabase.from('partnerships').select('*, deals(*)').eq('influencer_id', influencerId).eq('is_pushed_to_token', true)
-      
-      if (dealsData) {
-        setLiveDeals(dealsData.map((d: any, i: number) => ({
-          id: d.id || i,
-          brandId: d.brand_id || null,
-          partnershipId: d.id || null,
-          dealId: d.deal_id || null,
-          brand: d.deals?.title || 'MATRIX NODE',
-          offer: `${d.user_discount_pct || 0}% OFF`,
-          logo: d.deals?.logo || '💎',
-          backIntelPhone: d.deals?.intel?.phone || 'Secret Node',
-          intel: d.deals?.intel || {}
-        })))
-      }
-
-      if (influencerId) setOwned(walletOwns(influencerId))
-    } catch (err) { console.error(err) } finally { setLoading(false) }
-  }
-
-  const limitValue = Number(profile?.token_limit || 0)
-  const claimsValue = Number(profile?.token_claims || 0)
-  const atLimit = limitValue > 0 && claimsValue >= limitValue
-  const blocked = soldOut || (atLimit && !owned)
-
-  const handleSync = async () => {
-    if (!profile?.id || !influencerId || blocked || claimingRef.current) return
-    claimingRef.current = true
-    setClaiming(true)
-    setClaimNote(null)
-
-    try {
-      const result = await trackTokenEvent({
-        influencerId,
-        eventType: 'claim',
-        source: 'claim',
-      })
-
-      if (result?.limitReached || result?.error === 'LIMIT_REACHED') {
-        setSoldOut(true)
-        setProfile((prev: any) => prev ? { ...prev, token_claims: prev.token_limit } : prev)
+      const response = await fetch(`/api/public/claim?${params.toString()}`)
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data?.profile?.id) {
+        setProfile(null)
+        setLiveDeals([])
         return
       }
 
-      if (!result?.ok) {
-        setClaimNote('SIGNAL FAILED — TRY AGAIN')
-        return
+      setProfile(data.profile)
+      const trackedId = data.profile.id as string
+      if (!viewTracked.current) {
+        viewTracked.current = true
+        trackTokenEvent({ influencerId: trackedId, eventType: 'view', source: 'claim' })
       }
 
-      if (typeof result.token_claims === 'number') {
-        setProfile((prev: any) => prev ? {
-          ...prev,
-          token_claims: result.token_claims,
-          token_limit: result.token_limit ?? prev.token_limit,
-        } : prev)
-      }
-
-      const existing = localStorage.getItem('matrix_user_wallet')
-      let wallet = existing ? JSON.parse(existing) : []
-      if (!Array.isArray(wallet)) wallet = []
-
-      const tokenToSave = { profile, liveDeals }
-      if (!wallet.find((token: any) => token?.profile?.id === profile.id)) {
-        wallet.push(tokenToSave)
-        localStorage.setItem('matrix_user_wallet', JSON.stringify(wallet))
-      }
-
-      window.location.href = '/wallet'
-    } catch {
-      setClaimNote('SIGNAL FAILED — TRY AGAIN')
+      const rows = Array.isArray(data.partnerships) ? data.partnerships : []
+      setLiveDeals(rows.flatMap((row: any, index: number) => {
+        if (row.status !== 'active' || row.is_pushed_to_token !== true) return []
+        const deal = row.deal
+        const dealId = row.deal_id || deal?.id || null
+        if (!dealId) return []
+        return [{
+          id: row.id || index,
+          brandId: row.brand_id || deal?.brand_id || null,
+          partnershipId: row.id || null,
+          dealId,
+          brand: deal?.title || 'MATRIX NODE',
+          offer: formatOffer(deal),
+          logo: deal?.image_url || deal?.logo || '💎',
+          backIntelPhone: deal?.description || deal?.intel?.phone || 'Secret Node',
+          intel: deal?.intel || {},
+        }]
+      }))
+    } catch (err) {
+      console.error(err)
     } finally {
-      claimingRef.current = false
-      setClaiming(false)
+      setLoading(false)
     }
   }
 
-  if (loading) return <div className="min-h-screen bg-[#010201] text-emerald-500 font-black uppercase tracking-[0.5em] animate-pulse flex items-center justify-center italic">Intercepting Signal...</div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#010201] text-emerald-500 font-black uppercase tracking-[0.5em] animate-pulse flex items-center justify-center italic">
+        Intercepting Signal...
+      </div>
+    )
+  }
 
   return (
     <main className="min-h-screen bg-[#010201] flex flex-col items-center justify-center p-6 relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#10b98108,transparent_70%)] pointer-events-none" />
-      
-      {/* 🚀 ზომა გასწორებულია 340px-ზე, როგორც ვოლეტში */}
-      <div className="z-10 flex flex-col items-center w-full max-w-[340px]">
-        {limitValue > 0 && (
-          <div className="mb-5 px-5 py-2 rounded-full border border-emerald-500/30 bg-[#040d08] text-emerald-400 text-[9px] font-black uppercase tracking-[0.35em] italic">
-            {`${claimsValue} / ${profile.token_limit} CLAIMED`}
-          </div>
-        )}
 
-        <InfluXCard
-          profile={profile}
-          liveDeals={liveDeals}
-          disableRotation={false}
-          onFlip={() => {
-            if (!influencerId) return
-            trackTokenEvent({ influencerId, eventType: 'flip', source: 'claim' })
-          }}
-          onDealClick={(deal) => {
-            if (!influencerId) return
-            const brandId = deal.brandId
-            trackTokenEvent({
-              influencerId,
-              eventType: 'deal_click',
-              brandId,
-              partnershipId: deal.partnershipId,
-              dealId: deal.dealId,
-              source: 'claim',
-            })
-            const inWallet = walletOwns(influencerId)
-            const limitReached = soldOut || atLimit
-            if ((limitReached && !inWallet) || !brandId || !profile) return
-            localStorage.setItem('matrix_active_token', JSON.stringify({ profile, liveDeals }))
-            router.push(`/pay?brand=${brandId}&influencer=${influencerId}`)
-          }}
-        >
-          
-          {/* 🚀 ღილაკი იდენტურია ვოლეტის სტილის */}
-          <button 
-            onClick={handleSync}
-            onDoubleClick={(e) => e.stopPropagation()}
-            disabled={blocked || claiming}
-            className={`rounded-full font-black uppercase italic whitespace-nowrap transition-all duration-500 ${
-              blocked
-                ? 'px-6 py-3.5 bg-white/10 text-white/50 text-[9px] tracking-[0.18em] cursor-not-allowed'
-                : 'px-12 py-3.5 bg-white text-black text-[11px] tracking-[0.4em] hover:bg-emerald-500 hover:text-white shadow-[0_0_30px_rgba(255,255,255,0.1)] active:scale-95'
-            }`}
-          >
-            {blocked ? 'SOLD OUT / LIMIT REACHED' : claiming ? 'SYNCING...' : 'GET IT'}
-          </button>
-          
-        </InfluXCard>
-        {claimNote && (
-          <p className="mt-4 text-[9px] text-white/40 font-black uppercase tracking-[0.35em] italic">{claimNote}</p>
+      <div className="z-10 flex flex-col items-center w-full max-w-[340px]">
+        {!profile?.id ? (
+          <p className="text-center text-[11px] font-black uppercase tracking-[0.28em] text-white/50 italic">
+            ბმული არასწორია
+          </p>
+        ) : (
+          <InfluXCard
+            profile={profile}
+            liveDeals={liveDeals}
+            disableRotation={false}
+            onFlip={() => {
+              trackTokenEvent({ influencerId: profile.id, eventType: 'flip', source: 'claim' })
+            }}
+            onDealClick={(deal) => {
+              if (!deal?.dealId) return
+              void trackTokenEvent({
+                influencerId: profile.id,
+                eventType: 'deal_click',
+                brandId: deal.brandId,
+                partnershipId: deal.partnershipId,
+                dealId: deal.dealId,
+                source: 'claim',
+              })
+              const params = new URLSearchParams({
+                deal: String(deal.dealId),
+                ref: profile.id,
+              })
+              window.location.assign(`/pay?${params.toString()}`)
+            }}
+          />
         )}
       </div>
     </main>
   )
 }
 
-export default function ClaimPage() { 
-  return <Suspense fallback={null}><ClaimContent /></Suspense> 
+export default function ClaimPage() {
+  return (
+    <Suspense fallback={null}>
+      <ClaimContent />
+    </Suspense>
+  )
 }

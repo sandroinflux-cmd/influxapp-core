@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const EVENT_TYPES = ['view', 'flip', 'deal_click', 'claim'] as const
+const EVENT_TYPES = ['view', 'flip', 'deal_click', 'claim', 'checkout_view', 'payment_init'] as const
 type EventType = (typeof EVENT_TYPES)[number]
 
 type ProfileCounters = {
@@ -290,6 +290,20 @@ export async function POST(request: Request) {
         }
       }
 
+      return NextResponse.json({ ok: true })
+    }
+
+    if (eventType === 'checkout_view' || eventType === 'payment_init') {
+      const { error: insertError } = await supabase.from('token_events').insert({
+        influencer_id: influencerId,
+        brand_id: brandId,
+        partnership_id: partnershipId,
+        deal_id: dealId,
+        event_type: eventType,
+        visitor_id: visitorId,
+        source: 'checkout',
+      })
+      if (insertError) throw new Error(insertError.message)
       return NextResponse.json({ ok: true })
     }
 

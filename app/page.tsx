@@ -32,7 +32,6 @@ const translations = {
   ka: {
     heroTag: "ინფლუენსერ მარკეტინგის მომავალი",
     cta: "შემოუერთდი სისტემას",
-    tokens: "ჩემი ტოკენები",
     sections: [
       { id: 'influencer', title: 'Influencers', color: '#10b981', text: 'ინფლუენსერები შეძლებენ უკეთ მოახდინონ საკუთარი გავლენის მონეტიზაცია - აიღონ საკომისიო ყოველი ტრანზაქციიდან.' },
       { id: 'brand', title: 'Brands', color: '#3b82f6', text: 'ბრენდები შეძლებენ უფასოდ დაიწყონ თანამშრომლობა და გადაუხადონ საკომისიო მხოლოდ გაყიდვებიდან.' },
@@ -42,7 +41,6 @@ const translations = {
   en: {
     heroTag: "The Future of Influencer Marketing",
     cta: "JOIN THE SYSTEM",
-    tokens: "MY TOKENS",
     sections: [
       { id: 'influencer', title: 'Influencers', color: '#10b981', text: 'Influencers can effectively convert their impact into revenue, earning commissions from their followers\' transactions.' },
       { id: 'brand', title: 'Brands', color: '#3b82f6', text: 'Brands can start collaborating with influencers for free and pay commissions only on generated sales.' },
@@ -105,15 +103,6 @@ export default function NeuralInterface() {
             className="flex-1 py-5 bg-white text-black text-sm md:text-base tracking-tighter rounded-full transition-all shadow-xl font-[1000]"
           >
             {t.cta}
-          </motion.button>
-          
-          <motion.button 
-            whileHover={{ scale: 1.03, boxShadow: "0 0 30px rgba(255,255,255,0.2)" }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => router.push('/wallet')}
-            className="flex-1 py-5 bg-white text-black text-sm md:text-base tracking-tighter rounded-full transition-all shadow-xl font-[1000]"
-          >
-            {t.tokens}
           </motion.button>
         </div>
       </section>

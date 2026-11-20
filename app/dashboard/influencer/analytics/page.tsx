@@ -42,6 +42,8 @@ const EMPTY_FUNNEL = {
   flips: 0,
   clickUnique: 0,
   clickTotal: 0,
+  checkoutViews: 0,
+  paymentInits: 0,
   claims: 0,
   purchases: 0,
 }
@@ -112,10 +114,14 @@ export default function AnalyticsPage() {
       const viewRows = events.filter((event) => event.event_type === 'view')
       const flipRows = events.filter((event) => event.event_type === 'flip')
       const clickRows = events.filter((event) => event.event_type === 'deal_click')
+      const checkoutRows = events.filter((event) => event.event_type === 'checkout_view')
+      const paymentRows = events.filter((event) => event.event_type === 'payment_init')
       const claimRows = events.filter((event) => event.event_type === 'claim')
       const views = uniqueVisitors(viewRows)
       const flips = uniqueVisitors(flipRows)
       const clickUnique = uniqueVisitors(clickRows)
+      const checkoutViews = uniqueVisitors(checkoutRows)
+      const paymentInits = uniqueVisitors(paymentRows)
       const claims = uniqueVisitors(claimRows)
 
       setFunnel({
@@ -123,10 +129,12 @@ export default function AnalyticsPage() {
         flips,
         clickUnique,
         clickTotal: clickRows.length,
+        checkoutViews,
+        paymentInits,
         claims,
         purchases: txs.length,
       })
-      setConversionRate(percent(txs.length, claims))
+      setConversionRate(percent(txs.length, paymentInits))
 
       const brandIds = [...new Set(
         [...events.map((event) => event.brand_id), ...txs.map((tx) => tx.brand_id), ...partnerships.map((partnership) => partnership.brand_id)].filter(Boolean)
@@ -144,10 +152,10 @@ export default function AnalyticsPage() {
         if (title) dealName.set(partnership.brand_id, title)
       })
 
-      const buckets = new Map<string, { clickVisitors: Set<string>; clicks: number; claimVisitors: Set<string>; purchases: number; revenue: number }>()
+      const buckets = new Map<string, { clickVisitors: Set<string>; clicks: number; checkout: Set<string>; payments: Set<string>; claimVisitors: Set<string>; purchases: number; revenue: number }>()
       const ensure = (brandId: string) => {
         if (!buckets.has(brandId)) {
-          buckets.set(brandId, { clickVisitors: new Set(), clicks: 0, claimVisitors: new Set(), purchases: 0, revenue: 0 })
+          buckets.set(brandId, { clickVisitors: new Set(), clicks: 0, checkout: new Set(), payments: new Set(), claimVisitors: new Set(), purchases: 0, revenue: 0 })
         }
         return buckets.get(brandId)!
       }
@@ -163,6 +171,8 @@ export default function AnalyticsPage() {
           bucket.clicks += 1
           bucket.clickVisitors.add(visitor)
         }
+        if (event.event_type === 'checkout_view') bucket.checkout.add(visitor)
+        if (event.event_type === 'payment_init') bucket.payments.add(visitor)
         if (event.event_type === 'claim') bucket.claimVisitors.add(visitor)
       })
       txs.forEach((tx) => {
@@ -177,6 +187,8 @@ export default function AnalyticsPage() {
         name: profileName.get(brandId) || dealName.get(brandId) || 'MATRIX NODE',
         uniqueClicks: bucket.clickVisitors.size,
         totalClicks: bucket.clicks,
+        checkoutViews: bucket.checkout.size,
+        paymentInits: bucket.payments.size,
         claims: bucket.claimVisitors.size,
         purchases: bucket.purchases,
         revenue: money(bucket.revenue),
@@ -200,7 +212,7 @@ export default function AnalyticsPage() {
           const monthStr = monthNames[date.getMonth()]
           
           const amount = Number(tx.influencer_earned) || 0
-          const ownerId = tx.token_id || 'unknown'
+          const ownerId = tx.customer_phone || tx.id
 
           allUniqueOwners.add(ownerId)
 
@@ -246,11 +258,12 @@ export default function AnalyticsPage() {
   }
 
   const stages = [
-    { label: 'Token Views', value: funnel.views, detail: 'Unique people' },
-    { label: 'Token Flips', value: funnel.flips, detail: `${percent(funnel.flips, funnel.views)}% of views` },
-    { label: 'Brand Deal Clicks', value: funnel.clickUnique, detail: `${funnel.clickTotal} clicks · ${percent(funnel.clickUnique, funnel.views)}% of views` },
-    { label: 'Token Claims', value: funnel.claims, detail: `${percent(funnel.claims, funnel.views)}% of views` },
-    { label: 'Purchases / Conversions', value: funnel.purchases, detail: `${percent(funnel.purchases, funnel.claims)}% of claims` },
+    { label: 'Views', value: funnel.views, detail: 'Unique people' },
+    { label: 'Flips', value: funnel.flips, detail: `${percent(funnel.flips, funnel.views)}% of views` },
+    { label: 'Deal Clicks', value: funnel.clickUnique, detail: `${funnel.clickTotal} clicks · ${percent(funnel.clickUnique, funnel.views)}% of views` },
+    { label: 'Checkout Views', value: funnel.checkoutViews, detail: `${percent(funnel.checkoutViews, funnel.clickUnique)}% of deal clicks` },
+    { label: 'Payment Inits', value: funnel.paymentInits, detail: `${percent(funnel.paymentInits, funnel.checkoutViews)}% of checkout views` },
+    { label: 'Approved Orders', value: funnel.purchases, detail: `${percent(funnel.purchases, funnel.paymentInits)}% of payment inits` },
   ]
 
   if (loading) return <div className="min-h-screen bg-[#010201] flex items-center justify-center text-emerald-500 font-black italic animate-pulse uppercase tracking-widest">Analyzing Matrix...</div>
@@ -270,7 +283,7 @@ export default function AnalyticsPage() {
 
       <section className="mb-12">
         <h4 className="text-[10px] text-emerald-500/40 tracking-[0.5em] ml-4 mb-6">Token Funnel</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {stages.map((stage) => (
             <div key={stage.label} className="bg-white/[0.02] border border-white/5 rounded-[32px] p-6">
               <span className="text-[8px] text-gray-600 tracking-[0.2em] block mb-3">{stage.label}</span>
@@ -284,26 +297,28 @@ export default function AnalyticsPage() {
       <section className="mb-12">
         <h4 className="text-[10px] text-emerald-500/40 tracking-[0.5em] ml-4 mb-6">Per-Brand Breakdown</h4>
         <div className="bg-white/[0.02] border border-white/5 rounded-[40px] overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left">
+          <table className="w-full min-w-[980px] text-left">
             <thead>
               <tr className="text-[8px] text-gray-600 tracking-[0.3em] border-b border-white/5">
                 <th className="px-8 py-5 font-black">Brand Name</th>
                 <th className="px-6 py-5 font-black">Deal Clicks</th>
-                <th className="px-6 py-5 font-black">Claims</th>
-                <th className="px-6 py-5 font-black">Purchases</th>
+                <th className="px-6 py-5 font-black">Checkout</th>
+                <th className="px-6 py-5 font-black">Payment</th>
+                <th className="px-6 py-5 font-black">Orders</th>
                 <th className="px-8 py-5 font-black text-right">Total Revenue</th>
               </tr>
             </thead>
             <tbody>
               {brandRows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-8 py-10 text-[10px] text-gray-600 tracking-[0.3em]">No partnered brands yet</td>
+                  <td colSpan={6} className="px-8 py-10 text-[10px] text-gray-600 tracking-[0.3em]">No partnered brands yet</td>
                 </tr>
               ) : brandRows.map((brand) => (
                 <tr key={brand.id} className="border-b border-white/5 last:border-0">
                   <td className="px-8 py-6 text-lg">{brand.name}</td>
                   <td className="px-6 py-6">{brand.uniqueClicks} <span className="text-[10px] text-gray-600">unique</span> · {brand.totalClicks}</td>
-                  <td className="px-6 py-6">{brand.claims}</td>
+                  <td className="px-6 py-6">{brand.checkoutViews}</td>
+                  <td className="px-6 py-6">{brand.paymentInits}</td>
                   <td className="px-6 py-6">{brand.purchases}</td>
                   <td className="px-8 py-6 text-right text-emerald-500">{brand.revenue} ₾</td>
                 </tr>

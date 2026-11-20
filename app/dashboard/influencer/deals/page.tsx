@@ -11,11 +11,13 @@ const isValidGeorgianIban = (iban?: string | null) =>
 export default function MyDealsPage() {
   const [activeDeals, setActiveDeals] = useState<any[]>([])
   const [profileIban, setProfileIban] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [username, setUsername] = useState<string | null>(null)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [flippedId, setFlippedId] = useState<string | null>(null)
 
   const [splittingDeal, setSplittingDeal] = useState<any | null>(null)
-  const [userDiscount, setUserDiscount] = useState<number>(0)
   const [isDeploying, setIsDeploying] = useState(false)
 
   useEffect(() => {
@@ -28,7 +30,7 @@ export default function MyDealsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const [{ data: profileData }, { data, error }] = await Promise.all([
-          supabase.from('profiles').select('iban').eq('id', user.id).single(),
+          supabase.from('profiles').select('iban, username').eq('id', user.id).single(),
           supabase
             .from('partnerships')
             .select('*, deals(*)')
@@ -36,6 +38,8 @@ export default function MyDealsPage() {
             .eq('status', 'active')
         ])
 
+        setUserId(user.id)
+        setUsername(profileData?.username || null)
         setProfileIban(profileData?.iban || null)
         if (error) throw error
         if (data) setActiveDeals(data)
@@ -58,14 +62,13 @@ export default function MyDealsPage() {
 
     try {
       const currentDeal = Array.isArray(splittingDeal.deals) ? splittingDeal.deals[0] : splittingDeal.deals
-      const total = Number(currentDeal?.totalShare ?? splittingDeal?.total_percentage ?? 0)
-      const discount = Math.min(Math.max(0, Number(userDiscount)), total)
-      const influencerCut = Math.max(0, total - discount)
+      const shareCap = Number(currentDeal?.totalShare ?? splittingDeal?.total_percentage ?? 0)
+      const influencerCut = Number.isFinite(shareCap) ? Math.max(0, shareCap) : 0
 
       const { data, error } = await supabase
         .from('partnerships')
         .update({
-          user_discount_pct: discount,
+          user_discount_pct: 0,
           influencer_cut_pct: influencerCut,
           is_pushed_to_token: true
         })
@@ -84,7 +87,7 @@ export default function MyDealsPage() {
             ? {
                 ...deal,
                 is_pushed_to_token: true,
-                user_discount_pct: discount,
+                user_discount_pct: 0,
                 influencer_cut_pct: influencerCut
               }
             : deal
@@ -109,13 +112,43 @@ export default function MyDealsPage() {
   const modalTotalShare = Number(modalDealData?.totalShare ?? splittingDeal?.total_percentage ?? 0)
   const hasValidIban = isValidGeorgianIban(profileIban)
 
+  const copyText = async (key: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiedKey(key)
+      window.setTimeout(() => setCopiedKey((current) => current === key ? null : current), 2000)
+    } catch {
+      alert(value)
+    }
+  }
+
+  const bioLink = () => {
+    if (!userId || typeof window === 'undefined') return ''
+    return username
+      ? `${window.location.origin}/${username}`
+      : `${window.location.origin}/claim?ref=${userId}`
+  }
+
+  const storyLink = (dealId: string) => {
+    if (!userId || typeof window === 'undefined') return ''
+    return `${window.location.origin}/pay?deal=${dealId}&ref=${userId}`
+  }
+
   return (
     <div className="p-4 md:p-10 lg:p-14 space-y-12 max-w-6xl mx-auto pb-32 font-sans text-white overflow-x-hidden">
-      <header className="flex justify-between items-center border-b border-white/5 pb-10 italic font-black uppercase">
+      <header className="flex justify-between items-center gap-4 border-b border-white/5 pb-10 italic font-black uppercase">
         <div>
           <h1 className="text-4xl tracking-tighter leading-none">My <span className="text-emerald-500 italic">Vault</span></h1>
           <p className="text-[7px] tracking-[0.5em] text-gray-600 mt-4 leading-none">Authorized Matrix Node Access</p>
         </div>
+        <button
+          type="button"
+          disabled={!userId}
+          onClick={() => copyText('bio', bioLink())}
+          className="shrink-0 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-5 py-3 text-[10px] tracking-[0.2em] text-emerald-300 disabled:opacity-40"
+        >
+          {copiedKey === 'bio' ? 'Copied' : 'Copy Bio Link'}
+        </button>
       </header>
 
       {!hasValidIban && (
@@ -142,46 +175,9 @@ export default function MyDealsPage() {
                   <p className="text-5xl">{modalTotalShare}%</p>
                 </div>
 
-                <div className="space-y-6 text-left">
-                  <div className="flex justify-between text-[10px] tracking-widest leading-none">
-                    <span className="text-emerald-500 font-black uppercase">USER DISCOUNT: {userDiscount}%</span>
-                    <span className="text-white/70 font-black uppercase">YOUR CUT: {modalTotalShare - userDiscount}%</span>
-                  </div>
-
-                  <input
-                    type="range"
-                    min={0}
-                    max={modalTotalShare}
-                    step={1}
-                    value={userDiscount}
-                    onChange={(e) => setUserDiscount( Number(e.target.value) )}
-                    className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-emerald-500"
-                  />
-
-                  <div className="flex justify-between gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setUserDiscount(0)}
-                      className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[8px] tracking-widest text-gray-300"
-                    >
-                      100% MY COMMISSION
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUserDiscount(Math.round(modalTotalShare / 2))}
-                      className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[8px] tracking-widest text-gray-300"
-                    >
-                      50 / 50 SPLIT
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUserDiscount(modalTotalShare)}
-                      className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[8px] tracking-widest text-emerald-400"
-                    >
-                      100% USER DISCOUNT
-                    </button>
-                  </div>
-                </div>
+                <p className="text-[9px] text-gray-500 tracking-widest leading-relaxed normal-case not-italic">
+                  Buyer savings are already set by the bundle price. Your commission is {modalTotalShare}% of each sale.
+                </p>
 
                 <button
                   disabled={isDeploying || !hasValidIban}
@@ -238,6 +234,19 @@ export default function MyDealsPage() {
                         User: {item.user_discount_pct ?? 0}% | You: {item.influencer_cut_pct ?? 0}%
                       </p>
                     )}
+                    {item.is_pushed_to_token && dealData?.id && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          copyText(`story-${item.id}`, storyLink(dealData.id))
+                        }}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        className="mt-3 rounded-full border border-white/15 bg-white/5 px-3 py-2 text-[8px] font-black uppercase tracking-[0.18em] text-white/80 hover:border-emerald-400/50 hover:text-emerald-300"
+                      >
+                        {copiedKey === `story-${item.id}` ? 'Copied' : 'Copy Direct Story Link'}
+                      </button>
+                    )}
                   </div>
 
                   <div className="relative w-full h-12 flex justify-center items-end pb-2">
@@ -250,11 +259,6 @@ export default function MyDealsPage() {
                         onClick={(e) => {
                           e.stopPropagation()
                           setSplittingDeal(item)
-                          const currentDiscount =
-                            item.is_pushed_to_token
-                              ? Number(item.user_discount_pct ?? 0)
-                              : Math.round(totalShare * 0.7)
-                          setUserDiscount(currentDiscount)
                         }}
                         className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] transition-all italic active:scale-95 shadow-xl ${
                           item.is_pushed_to_token
@@ -262,7 +266,7 @@ export default function MyDealsPage() {
                             : 'bg-white text-black hover:bg-emerald-500 hover:text-white'
                         }`}
                       >
-                        {item.is_pushed_to_token ? 'SYNCED ✓ (EDIT SPLIT)' : 'ADD TO TOKEN'}
+                        {item.is_pushed_to_token ? 'SYNCED ✓' : 'ADD TO TOKEN'}
                       </button>
                     </div>
                   </div>

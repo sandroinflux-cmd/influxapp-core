@@ -5,28 +5,39 @@ import { useParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { playChaChingSound, unlockAudio } from '@/lib/cashRegisterSound'
 
+type FulfillmentStatus = 'pending' | 'shipped' | 'delivered'
+
 type MonitorTransaction = {
   id: string
-  amount: number | null
-  bill_amount: number | null
-  final_amount: number | null
-  discount_percent: number | null
-  status: string
   created_at: string
-  customer_phone: string | null
-  gift_unlocked: boolean
-  gift_description: string | null
+  final_amount: number | null
+  brand_earned: number | null
   deal_title: string | null
   influencer_name: string | null
+  gift_description: string | null
+  customer_name: string | null
+  customer_phone: string | null
+  customer_city: string | null
+  customer_address: string | null
+  delivery_note: string | null
+  fulfillment_status: string | null
+  payout_status: string | null
+  status: string
 }
 
 type MonitorPayload = {
   brand: { id: string; full_name: string; avatar_url: string | null }
-  stats: { todayCount: number; todayTotal: number; timezone?: string }
+  stats: { todayCount: number; todayTotal: number; todayBrand?: number; timezone?: string }
   transactions: MonitorTransaction[]
 }
 
 type Filter = 'all' | 'gifts' | 'paid'
+
+const FULFILLMENT_STEPS: { value: FulfillmentStatus; ka: string; en: string }[] = [
+  { value: 'pending', ka: 'მზადდება', en: 'Pending' },
+  { value: 'shipped', ka: 'გაგზავნილია', en: 'Shipped' },
+  { value: 'delivered', ka: 'ჩაბარებულია', en: 'Delivered' },
+]
 
 function isPaidStatus(status: string) {
   return ['approved', 'completed', 'success', 'paid'].includes(String(status || '').toLowerCase())
@@ -34,6 +45,16 @@ function isPaidStatus(status: string) {
 
 function money(value: number) {
   return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function shortOrderId(id: string) {
+  return id.replace(/-/g, '').slice(0, 8).toUpperCase()
+}
+
+function fulfillmentOf(status: string | null | undefined): FulfillmentStatus {
+  const value = String(status || '').toLowerCase()
+  if (value === 'shipped' || value === 'delivered') return value
+  return 'pending'
 }
 
 function when(iso: string) {
@@ -51,15 +72,6 @@ function when(iso: string) {
   return { clock, relative: `${Math.floor(seconds / 86400)}d ago` }
 }
 
-function discountLabel(tx: MonitorTransaction) {
-  const original = Number(tx.bill_amount ?? tx.amount ?? 0)
-  const paid = Number(tx.final_amount ?? 0)
-  const stored = Number(tx.discount_percent ?? 0)
-  if (stored > 0) return Math.round(stored)
-  if (original > paid && original > 0) return Math.round((1 - paid / original) * 100)
-  return 0
-}
-
 function telHref(phone: string) {
   return `tel:${phone.replace(/[^\d+]/g, '')}`
 }
@@ -68,13 +80,81 @@ function previewSound() {
   void unlockAudio().then(() => playChaChingSound()).catch(() => {})
 }
 
-function OrderCard({ tx, fresh, hero }: { tx: MonitorTransaction; fresh: boolean; hero?: boolean }) {
-  const paid = Number(tx.final_amount ?? 0)
-  const original = Number(tx.bill_amount ?? tx.amount ?? 0)
-  const discount = discountLabel(tx)
-  const time = when(tx.created_at)
+function DeliveryBlock({ tx }: { tx: MonitorTransaction }) {
   const phone = tx.customer_phone?.trim() || ''
-  const meta = [tx.deal_title, tx.influencer_name].filter(Boolean).join(' · ')
+  return (
+    <div className="mt-3 space-y-1.5 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 text-left">
+      <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/35">Delivery</p>
+      <p className="text-base font-black leading-tight text-white">{tx.customer_name?.trim() || '—'}</p>
+      {phone ? (
+        <a href={telHref(phone)} className="inline-flex text-sm font-black text-emerald-300">
+          {phone}
+        </a>
+      ) : (
+        <p className="text-sm font-bold text-white/35">No phone</p>
+      )}
+      <p className="text-sm font-bold text-white/80">{tx.customer_city?.trim() || '—'}</p>
+      <p className="text-sm font-semibold leading-snug text-white">{tx.customer_address?.trim() || '—'}</p>
+      {tx.delivery_note?.trim() ? (
+        <p className="rounded-xl bg-amber-400/10 px-3 py-2 text-sm font-semibold leading-snug text-amber-100">
+          {tx.delivery_note.trim()}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+function FulfillmentActions({
+  status,
+  busy,
+  onChange,
+}: {
+  status: string | null
+  busy: boolean
+  onChange: (next: FulfillmentStatus) => void
+}) {
+  const current = fulfillmentOf(status)
+  return (
+    <div className="mt-3 grid grid-cols-3 gap-1.5">
+      {FULFILLMENT_STEPS.map((step) => {
+        const active = current === step.value
+        return (
+          <button
+            key={step.value}
+            type="button"
+            disabled={busy || active}
+            onClick={() => onChange(step.value)}
+            className={`min-h-[48px] rounded-xl px-1 py-1.5 text-center leading-tight ${
+              active ? 'bg-emerald-400 text-black' : 'border border-white/10 bg-white/5 text-white/75'
+            } disabled:opacity-90`}
+          >
+            <span className="block text-[10px] font-black">{step.ka}</span>
+            <span className="block text-[8px] font-bold uppercase tracking-wider opacity-70">{step.en}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function OrderCard({
+  tx,
+  fresh,
+  hero,
+  busy,
+  onFulfillment,
+}: {
+  tx: MonitorTransaction
+  fresh: boolean
+  hero?: boolean
+  busy: boolean
+  onFulfillment: (transactionId: string, status: FulfillmentStatus) => void
+}) {
+  const paid = Number(tx.final_amount ?? 0)
+  const brandNet = Number(tx.brand_earned ?? 0)
+  const time = when(tx.created_at)
+  const current = fulfillmentOf(tx.fulfillment_status)
+  const step = FULFILLMENT_STEPS.find((item) => item.value === current) || FULFILLMENT_STEPS[0]
 
   return (
     <motion.article
@@ -96,74 +176,53 @@ function OrderCard({ tx, fresh, hero }: { tx: MonitorTransaction; fresh: boolean
       )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className={`${hero ? 'text-4xl' : 'text-2xl'} font-black leading-none tracking-tight`}>
+          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/40">#{shortOrderId(tx.id)}</p>
+          <p className={`${hero ? 'text-4xl' : 'text-2xl'} mt-1 font-black leading-none tracking-tight`}>
             {money(paid)} <span className={`${hero ? 'text-base' : 'text-sm'} text-white/40`}>GEL</span>
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {discount > 0 && (
-              <>
-                <span className="text-[11px] text-white/40 line-through">{money(original)} ₾</span>
-                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-black text-emerald-300">-{discount}%</span>
-              </>
-            )}
-          </div>
+          <p className="mt-1 text-[11px] font-bold text-emerald-300/80">Brand net {money(brandNet)} ₾</p>
         </div>
         <div className="shrink-0 text-right">
-          <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
-            isPaidStatus(tx.status)
-              ? 'bg-emerald-500/15 text-emerald-300'
-              : String(tx.status).toLowerCase() === 'pending'
-                ? 'bg-amber-400/15 text-amber-200'
-                : 'bg-white/10 text-white/50'
-          }`}>
-            {isPaidStatus(tx.status) ? 'Paid' : tx.status}
+          <span className="inline-flex rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-white/80">
+            {step.ka}
           </span>
           <p className="mt-2 text-sm font-black">{time.clock}</p>
           <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">{time.relative}</p>
         </div>
       </div>
 
-      {tx.gift_unlocked && (
+      <p className="mt-3 text-sm font-black leading-snug text-white">{tx.deal_title || 'Direct order'}</p>
+      <p className="mt-1 text-[11px] font-bold uppercase tracking-widest text-white/45">{tx.influencer_name || 'Influencer'}</p>
+
+      {tx.gift_description?.trim() && (
         <div className={`mt-3 rounded-2xl border border-amber-300/50 bg-gradient-to-r from-emerald-500/20 to-amber-400/20 font-black text-amber-100 ${
           hero ? 'px-4 py-4 text-base' : 'px-3 py-3 text-sm'
         }`}>
-          🎁 GIFT: {tx.gift_description || 'Included'}
+          🎁 {tx.gift_description.trim()}
         </div>
       )}
 
-      {phone ? (
-        <a
-          href={telHref(phone)}
-          className={`mt-3 flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 font-black text-black ${
-            hero ? 'min-h-[52px] text-base' : 'min-h-[44px] text-sm'
-          }`}
-        >
-          <span aria-hidden>☎</span>
-          {phone}
-        </a>
-      ) : (
-        <p className="mt-3 text-[11px] font-bold uppercase tracking-widest text-white/30">No phone linked</p>
+      <DeliveryBlock tx={tx} />
+      <FulfillmentActions
+        status={tx.fulfillment_status}
+        busy={busy}
+        onChange={(status) => onFulfillment(tx.id, status)}
+      />
+      {tx.payout_status && (
+        <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-white/35">Payout {tx.payout_status}</p>
       )}
-
-      <p className="mt-3 flex items-center justify-between gap-3 text-[11px] text-white/45">
-        <span className="truncate">{meta || 'Direct order'}</span>
-        <span className="shrink-0 font-black tracking-widest">#{tx.id.slice(-6).toUpperCase()}</span>
-      </p>
     </motion.article>
   )
 }
 
 function PaymentSpotlight({ tx, onClose }: { tx: MonitorTransaction; onClose: () => void }) {
   const paid = Number(tx.final_amount ?? 0)
-  const original = Number(tx.bill_amount ?? tx.amount ?? 0)
-  const discount = discountLabel(tx)
+  const brandNet = Number(tx.brand_earned ?? 0)
   const time = when(tx.created_at)
-  const phone = tx.customer_phone?.trim() || ''
-  const meta = [tx.deal_title, tx.influencer_name].filter(Boolean).join(' · ')
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-x-hidden p-3"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-x-hidden p-3 sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-label="Payment received"
@@ -182,7 +241,7 @@ function PaymentSpotlight({ tx, onClose }: { tx: MonitorTransaction; onClose: ()
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 16 }}
         transition={{ type: 'spring', stiffness: 280, damping: 26 }}
-        className="relative w-full max-w-lg overflow-hidden rounded-[32px] border border-emerald-400/80 bg-[#04110c] px-5 pb-6 pt-6 shadow-[0_0_80px_rgba(16,185,129,0.45)]"
+        className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[32px] border border-emerald-400/80 bg-[#04110c] px-5 pb-6 pt-6 shadow-[0_0_80px_rgba(16,185,129,0.45)]"
       >
         <div className="flex flex-col items-center text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/50 bg-emerald-500/15 px-3 py-1.5">
@@ -192,42 +251,24 @@ function PaymentSpotlight({ tx, onClose }: { tx: MonitorTransaction; onClose: ()
             </span>
             <span className="text-[11px] font-black uppercase tracking-widest text-emerald-200">Payment received ✓</span>
           </div>
-          <p className="mt-2 text-xs font-bold uppercase tracking-widest text-white/45">{time.clock} · {time.relative}</p>
+          <p className="mt-2 text-xs font-bold uppercase tracking-widest text-white/45">
+            #{shortOrderId(tx.id)} · {time.clock} · {time.relative}
+          </p>
           <p className="mt-5 text-5xl font-black leading-none tracking-tight text-white sm:text-6xl">
             {money(paid)} <span className="text-2xl text-white/45 sm:text-3xl">GEL</span>
           </p>
-          {discount > 0 && (
-            <div className="mt-3 flex items-center justify-center gap-2">
-              <span className="text-sm text-white/40 line-through">{money(original)} ₾</span>
-              <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-black text-emerald-300">-{discount}%</span>
-            </div>
-          )}
+          <p className="mt-2 text-sm font-bold text-emerald-300/80">Brand net {money(brandNet)} ₾</p>
+          <p className="mt-3 text-sm font-black text-white">{tx.deal_title || 'Direct order'}</p>
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/45">{tx.influencer_name || 'Influencer'}</p>
         </div>
 
-        {tx.gift_unlocked && (
+        {tx.gift_description?.trim() && (
           <div className="mt-5 rounded-2xl border-2 border-amber-300/70 bg-gradient-to-r from-emerald-500/25 via-emerald-400/10 to-amber-300/30 px-4 py-4 text-center text-lg font-black leading-snug text-amber-50 shadow-[0_0_24px_rgba(251,191,36,0.28)]">
-            🎁 GIVE GIFT: {tx.gift_description || 'Included'}
+            🎁 {tx.gift_description.trim()}
           </div>
         )}
 
-        {phone ? (
-          <a
-            href={telHref(phone)}
-            className="mt-4 flex min-h-[56px] items-center justify-center gap-2 rounded-2xl bg-white text-lg font-black text-black"
-          >
-            <span aria-hidden>☎</span>
-            {phone}
-          </a>
-        ) : tx.gift_unlocked ? (
-          <p className="mt-4 animate-pulse text-center text-xs font-bold uppercase tracking-widest text-amber-200/80">
-            Waiting for customer phone...
-          </p>
-        ) : null}
-
-        <p className="mt-4 flex items-center justify-between gap-3 text-center text-[12px] text-white/55">
-          <span className="min-w-0 flex-1 truncate text-left">{meta || 'Direct order'}</span>
-          <span className="shrink-0 font-black tracking-widest">#{tx.id.slice(-6).toUpperCase()}</span>
-        </p>
+        <DeliveryBlock tx={tx} />
 
         <button
           type="button"
@@ -236,12 +277,6 @@ function PaymentSpotlight({ tx, onClose }: { tx: MonitorTransaction; onClose: ()
         >
           OK / GOT IT
         </button>
-        <motion.div
-          className="absolute bottom-0 left-0 h-1 w-full origin-left bg-emerald-300"
-          initial={{ scaleX: 1 }}
-          animate={{ scaleX: 0 }}
-          transition={{ duration: 10, ease: 'linear' }}
-        />
       </motion.div>
     </motion.div>
   )
@@ -264,6 +299,7 @@ export default function PublicLiveMonitor() {
   const [filter, setFilter] = useState<Filter>('all')
   const [freshIds, setFreshIds] = useState<string[]>([])
   const [spotlightTxId, setSpotlightTxId] = useState<string | null>(null)
+  const [savingId, setSavingId] = useState<string | null>(null)
 
   useEffect(() => {
     soundOn.current = sound
@@ -362,6 +398,27 @@ export default function PublicLiveMonitor() {
     }
   }, [token])
 
+  const updateFulfillment = async (transactionId: string, fulfillment_status: FulfillmentStatus) => {
+    if (!token || savingId) return
+    setSavingId(transactionId)
+    setPayload((current) => current && ({
+      ...current,
+      transactions: current.transactions.map((tx) => tx.id === transactionId ? { ...tx, fulfillment_status } : tx),
+    }))
+    try {
+      const response = await fetch('/api/monitor/live', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, transactionId, fulfillment_status }),
+      })
+      if (!response.ok) loadRef.current()
+    } catch {
+      loadRef.current()
+    } finally {
+      setSavingId(null)
+    }
+  }
+
   if (invalid) {
     return (
       <main className="min-h-screen bg-[#010201] text-white flex items-center justify-center p-6 overflow-x-hidden">
@@ -383,7 +440,7 @@ export default function PublicLiveMonitor() {
   }
 
   const visible = payload.transactions.filter((tx) => {
-    if (filter === 'gifts') return tx.gift_unlocked
+    if (filter === 'gifts') return Boolean(tx.gift_description?.trim())
     if (filter === 'paid') return isPaidStatus(tx.status)
     return true
   })
@@ -426,8 +483,9 @@ export default function PublicLiveMonitor() {
               <p className="text-sm font-black">{payload.stats.todayCount} orders</p>
             </div>
             <div className="min-w-[46%] flex-1 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2">
-              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-300/70">Today total</p>
+              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-300/70">Today paid</p>
               <p className="text-sm font-black text-emerald-200">{money(payload.stats.todayTotal)} ₾</p>
+              <p className="text-[10px] font-bold text-emerald-100/60">Net {money(Number(payload.stats.todayBrand || 0))} ₾</p>
             </div>
             <button
               onClick={() => loadRef.current(true)}
@@ -485,7 +543,15 @@ export default function PublicLiveMonitor() {
           {visible.length === 0 && (
             <p className="py-16 text-center text-[11px] font-black uppercase tracking-[0.3em] text-white/35">No orders in this view</p>
           )}
-          {heroTx && <OrderCard tx={heroTx} fresh={freshIds.includes(heroTx.id)} hero />}
+          {heroTx && (
+            <OrderCard
+              tx={heroTx}
+              fresh={freshIds.includes(heroTx.id)}
+              hero
+              busy={savingId === heroTx.id}
+              onFulfillment={updateFulfillment}
+            />
+          )}
           {heroTx && earlier.length > 0 && (
             <div className="flex items-center gap-3 py-1">
               <div className="h-px flex-1 bg-white/10" />
@@ -494,7 +560,13 @@ export default function PublicLiveMonitor() {
             </div>
           )}
           {earlier.map((tx) => (
-            <OrderCard key={tx.id} tx={tx} fresh={freshIds.includes(tx.id)} />
+            <OrderCard
+              key={tx.id}
+              tx={tx}
+              fresh={freshIds.includes(tx.id)}
+              busy={savingId === tx.id}
+              onFulfillment={updateFulfillment}
+            />
           ))}
         </section>
       </div>

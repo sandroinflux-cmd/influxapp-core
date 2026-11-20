@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 
 export default function MobileInfluencerPublicProfile() {
   const { username } = useParams()
@@ -17,18 +16,17 @@ export default function MobileInfluencerPublicProfile() {
         return
       }
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', handle)
-        .single()
-
-      if (error || !profile?.id) {
+      try {
+        const response = await fetch(`/api/public/claim?username=${encodeURIComponent(handle)}`)
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok || !data?.profile?.id) {
+          setNotFound(true)
+          return
+        }
+        router.replace(`/claim?ref=${data.profile.id}`)
+      } catch {
         setNotFound(true)
-        return
       }
-
-      router.replace(`/claim?ref=${profile.id}`)
     }
 
     resolveProfile()

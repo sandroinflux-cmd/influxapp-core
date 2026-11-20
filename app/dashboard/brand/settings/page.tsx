@@ -1,9 +1,8 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { useState, useEffect, useRef } from 'react'
-import { supabase } from '@/lib/supabase' 
-import { QRCodeSVG } from 'qrcode.react'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export default function BrandSettingsPage() {
   const [brandId, setBrandId] = useState<string | null>(null)
@@ -20,7 +19,6 @@ export default function BrandSettingsPage() {
   const [monitorToken, setMonitorToken] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [resettingLink, setResettingLink] = useState(false)
-  const qrRef = useRef<SVGSVGElement>(null)
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -105,7 +103,6 @@ export default function BrandSettingsPage() {
         .from('deals')
         .update({
           logo: avatarUrl || '💠',
-          title: brandName || 'MATRIX BRAND',
           intel: { 
             type: sector || 'Active Venture', 
             location: address || 'Digital Node', 
@@ -149,27 +146,6 @@ export default function BrandSettingsPage() {
     }
   }
   
-  const downloadQR = () => {
-    if (!qrRef.current) return
-    const svgData = new XMLSerializer().serializeToString(qrRef.current)
-    const canvas = document.createElement("canvas")
-    const ctx = canvas.getContext("2d")
-    const img = new Image()
-    img.onload = () => {
-      canvas.width = img.width; canvas.height = img.height;
-      ctx?.drawImage(img, 0, 0)
-      const pngFile = canvas.toDataURL("image/png")
-      const downloadLink = document.createElement("a")
-      downloadLink.download = `MATRIX-QR.png`
-      downloadLink.href = pngFile
-      downloadLink.click()
-    }
-    img.src = `data:image/svg+xml;base64,${btoa(svgData)}`
-  }
-
-  const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || '');
-  const qrUrl = `${origin}/pay/${brandId || 'demo'}`
-
   return (
     <main className="min-h-screen w-full bg-[#010201] text-white p-6 md:p-14 overflow-x-hidden font-sans">
       <header className="mb-20 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-white/5 pb-12">
@@ -225,13 +201,6 @@ export default function BrandSettingsPage() {
               <div className="space-y-4 mb-10">
                 <label className="text-[9px] text-gray-600 uppercase font-black tracking-[0.4em] mb-2 block italic">Bank Account (IBAN)</label>
                 <input type="text" value={iban} onChange={(e) => setIban(e.target.value)} placeholder="GE00TB..." className="w-full bg-[#010201] border border-white/10 rounded-2xl p-6 text-sm font-black focus:border-blue-500/40 outline-none transition-all uppercase italic" />
-              </div>
-              <div className="flex items-center gap-8 pt-6 border-t border-white/5">
-                <div className="bg-white p-3 rounded-2xl shadow-xl"><QRCodeSVG id="brand-qr-code" value={qrUrl} size={110} level="H" includeMargin={true} ref={qrRef} /></div>
-                <div className="space-y-2">
-                  <p className="text-[8px] text-gray-500 tracking-[0.3em] uppercase italic font-black">Universal QR Asset</p>
-                  <button onClick={downloadQR} className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-500 hover:text-white transition-all italic border-b border-blue-500/20 pb-1 text-left">Download PNG ↓</button>
-                </div>
               </div>
             </div>
 

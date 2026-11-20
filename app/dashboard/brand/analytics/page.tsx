@@ -33,8 +33,11 @@ async function fetchAll(run: (from: number, to: number) => PromiseLike<{ data: a
 
 const EMPTY_FUNNEL = {
   views: 0,
+  flips: 0,
   clickUnique: 0,
   clickTotal: 0,
+  checkoutViews: 0,
+  paymentInits: 0,
   claims: 0,
   purchases: 0,
 }
@@ -100,11 +103,38 @@ export default function AnalyticsPage() {
       const viewRows = events.filter((event) => event.event_type === 'view')
       const clickRows = events.filter((event) => event.event_type === 'deal_click')
       const claimRows = events.filter((event) => event.event_type === 'claim')
+      const checkoutRows = events.filter((event) => event.event_type === 'checkout_view')
+      const paymentRows = events.filter((event) => event.event_type === 'payment_init')
+      const partnerIds = [...new Set(partnerships.map((row) => row.influencer_id).filter(Boolean))]
+      let flipRows = events.filter((event) => event.event_type === 'flip')
+      if (partnerIds.length > 0) {
+        try {
+          const extraFlips = await fetchAll((from, to) =>
+            supabase
+              .from('token_events')
+              .select('id, visitor_id, event_type, influencer_id')
+              .in('influencer_id', partnerIds)
+              .eq('event_type', 'flip')
+              .order('created_at', { ascending: true })
+              .order('id', { ascending: true })
+              .range(from, to)
+          )
+          const seen = new Set(flipRows.map((row) => row.id))
+          extraFlips.forEach((row) => {
+            if (!seen.has(row.id)) flipRows.push(row)
+          })
+        } catch (error) {
+          console.error('Flip events unavailable:', error)
+        }
+      }
 
       setFunnel({
         views: uniqueVisitors(viewRows),
+        flips: uniqueVisitors(flipRows),
         clickUnique: uniqueVisitors(clickRows),
         clickTotal: clickRows.length,
+        checkoutViews: uniqueVisitors(checkoutRows),
+        paymentInits: uniqueVisitors(paymentRows),
         claims: uniqueVisitors(claimRows),
         purchases: txData.length,
       })
@@ -137,10 +167,10 @@ export default function AnalyticsPage() {
         setMetrics({ revenue: 0, sales: 0, loyalty: '0.0x' })
       }
 
-      const buckets = new Map<string, { views: Set<string>; clickVisitors: Set<string>; clicks: number; claims: Set<string>; purchases: number; revenue: number }>()
+      const buckets = new Map<string, { views: Set<string>; flips: Set<string>; clickVisitors: Set<string>; clicks: number; checkout: Set<string>; payments: Set<string>; claims: Set<string>; purchases: number; revenue: number }>()
       const ensure = (influencerId: string) => {
         if (!buckets.has(influencerId)) {
-          buckets.set(influencerId, { views: new Set(), clickVisitors: new Set(), clicks: 0, claims: new Set(), purchases: 0, revenue: 0 })
+          buckets.set(influencerId, { views: new Set(), flips: new Set(), clickVisitors: new Set(), clicks: 0, checkout: new Set(), payments: new Set(), claims: new Set(), purchases: 0, revenue: 0 })
         }
         return buckets.get(influencerId)!
       }
@@ -153,11 +183,18 @@ export default function AnalyticsPage() {
         const bucket = ensure(event.influencer_id)
         const visitor = event.visitor_id || event.id
         if (event.event_type === 'view') bucket.views.add(visitor)
+        if (event.event_type === 'flip') bucket.flips.add(visitor)
         if (event.event_type === 'deal_click') {
           bucket.clicks += 1
           bucket.clickVisitors.add(visitor)
         }
+        if (event.event_type === 'checkout_view') bucket.checkout.add(visitor)
+        if (event.event_type === 'payment_init') bucket.payments.add(visitor)
         if (event.event_type === 'claim') bucket.claims.add(visitor)
+      })
+      flipRows.forEach((event) => {
+        if (!event.influencer_id) return
+        ensure(event.influencer_id).flips.add(event.visitor_id || event.id)
       })
       txData.forEach((tx) => {
         if (!tx.influencer_id) return
@@ -170,8 +207,11 @@ export default function AnalyticsPage() {
         id: influencerId,
         name: profileMap[influencerId] || `NODE_${influencerId.substring(0, 5).toUpperCase()}`,
         views: bucket.views.size,
+        flips: bucket.flips.size,
         uniqueClicks: bucket.clickVisitors.size,
         totalClicks: bucket.clicks,
+        checkoutViews: bucket.checkout.size,
+        paymentInits: bucket.payments.size,
         claims: bucket.claims.size,
         purchases: bucket.purchases,
         revenue: bucket.revenue,
@@ -184,10 +224,12 @@ export default function AnalyticsPage() {
   }, [])
 
   const stages = [
-    { label: 'Token Views', value: funnel.views, detail: 'Unique people' },
-    { label: 'Brand Deal Clicks', value: funnel.clickUnique, detail: `${funnel.clickTotal} clicks · ${percent(funnel.clickUnique, funnel.views)}% of views` },
-    { label: 'Token Claims', value: funnel.claims, detail: `${percent(funnel.claims, funnel.views)}% of views` },
-    { label: 'Completed Purchases', value: funnel.purchases, detail: `${percent(funnel.purchases, funnel.claims)}% of claims` },
+    { label: 'Views', value: funnel.views, detail: 'Unique people' },
+    { label: 'Flips', value: funnel.flips, detail: `${percent(funnel.flips, funnel.views)}% of views` },
+    { label: 'Deal Clicks', value: funnel.clickUnique, detail: `${funnel.clickTotal} clicks · ${percent(funnel.clickUnique, funnel.views)}% of views` },
+    { label: 'Checkout Views', value: funnel.checkoutViews, detail: `${percent(funnel.checkoutViews, funnel.clickUnique)}% of deal clicks` },
+    { label: 'Payment Inits', value: funnel.paymentInits, detail: `${percent(funnel.paymentInits, funnel.checkoutViews)}% of checkout views` },
+    { label: 'Approved Orders', value: funnel.purchases, detail: `${percent(funnel.purchases, funnel.paymentInits)}% of payment inits` },
   ]
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-blue-500 font-black animate-pulse uppercase italic text-xs tracking-widest">Compiling Matrix...</div>
@@ -219,7 +261,7 @@ export default function AnalyticsPage() {
 
       <section className="space-y-6">
         <span className="text-[10px] text-gray-600 tracking-[0.5em] px-2">Token Funnel</span>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {stages.map((stage) => (
             <div key={stage.label} className="bg-[#010201] border border-white/5 rounded-[32px] p-6">
               <span className="text-[8px] text-gray-600 tracking-[0.2em] block mb-3">{stage.label}</span>
@@ -233,28 +275,32 @@ export default function AnalyticsPage() {
       <div className="space-y-10">
         <span className="text-[10px] text-gray-600 tracking-[0.5em] px-2">Per-Influencer Breakdown</span>
         <div className="bg-[#010201] border border-white/5 rounded-[45px] overflow-x-auto">
-          <table className="w-full min-w-[860px] text-left">
+          <table className="w-full min-w-[1100px] text-left">
             <thead>
               <tr className="text-[8px] text-gray-600 tracking-[0.3em] border-b border-white/5">
                 <th className="px-8 py-5 font-black">Influencer Name</th>
                 <th className="px-6 py-5 font-black">Views</th>
+                <th className="px-6 py-5 font-black">Flips</th>
                 <th className="px-6 py-5 font-black">Deal Clicks</th>
-                <th className="px-6 py-5 font-black">Claims</th>
-                <th className="px-6 py-5 font-black">Purchases</th>
+                <th className="px-6 py-5 font-black">Checkout</th>
+                <th className="px-6 py-5 font-black">Payment</th>
+                <th className="px-6 py-5 font-black">Orders</th>
                 <th className="px-8 py-5 font-black text-right">Revenue</th>
               </tr>
             </thead>
             <tbody>
               {influencerRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-8 py-10 text-[10px] text-gray-600 tracking-[0.3em]">No influencer signal yet</td>
+                  <td colSpan={8} className="px-8 py-10 text-[10px] text-gray-600 tracking-[0.3em]">No influencer signal yet</td>
                 </tr>
               ) : influencerRows.map((inf) => (
                 <tr key={inf.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                   <td className="px-8 py-6 text-lg text-white">{inf.name}</td>
                   <td className="px-6 py-6">{inf.views}</td>
+                  <td className="px-6 py-6">{inf.flips}</td>
                   <td className="px-6 py-6">{inf.uniqueClicks} <span className="text-[10px] text-gray-600">unique</span> · {inf.totalClicks}</td>
-                  <td className="px-6 py-6">{inf.claims}</td>
+                  <td className="px-6 py-6">{inf.checkoutViews}</td>
+                  <td className="px-6 py-6">{inf.paymentInits}</td>
                   <td className="px-6 py-6">{inf.purchases}</td>
                   <td className="px-8 py-6 text-right">{money(inf.revenue)} ₾</td>
                 </tr>

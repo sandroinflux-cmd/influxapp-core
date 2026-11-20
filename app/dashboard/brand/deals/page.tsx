@@ -4,16 +4,38 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 
+const CATEGORIES = [
+  { value: 'beauty', label: 'Beauty' },
+  { value: 'fragrance', label: 'Fragrance' },
+  { value: 'jewelry', label: 'Jewelry' },
+  { value: 'gifts', label: 'Gifts' },
+  { value: 'other', label: 'Other' },
+] as const
+
+type DealCategory = (typeof CATEGORIES)[number]['value']
+
+function asCategory(value: unknown): DealCategory {
+  return CATEGORIES.some((item) => item.value === value) ? value as DealCategory : 'other'
+}
+
 export default function BrandDealsPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [flippedId, setFlippedId] = useState<string | null>(null)
   const [deals, setDeals] = useState<any[]>([])
-  const [newShare, setNewShare] = useState('')
+  const [title, setTitle] = useState('')
+  const [price, setPrice] = useState('')
+  const [originalPrice, setOriginalPrice] = useState('')
+  const [description, setDescription] = useState('')
+  const [imageUrl, setImageUrl] = useState('')
+  const [category, setCategory] = useState<DealCategory>('other')
+  const [stockLimit, setStockLimit] = useState('0')
   const [giftDescription, setGiftDescription] = useState('')
-  const [giftThreshold, setGiftThreshold] = useState('')
-  const [giftImageUrl, setGiftImageUrl] = useState('')
+  const [freeDelivery, setFreeDelivery] = useState(false)
+  const [deliveryEstimate, setDeliveryEstimate] = useState('')
+  const [isActive, setIsActive] = useState(true)
+  const [newShare, setNewShare] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [uploadingGift, setUploadingGift] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [loading, setLoading] = useState(true)
   
   const [brandProfile, setBrandProfile] = useState<any>(null)
@@ -48,64 +70,110 @@ export default function BrandDealsPage() {
   }
 
   const resetForm = () => {
-    setNewShare('')
+    setTitle('')
+    setPrice('')
+    setOriginalPrice('')
+    setDescription('')
+    setImageUrl('')
+    setCategory('other')
+    setStockLimit('0')
     setGiftDescription('')
-    setGiftThreshold('')
-    setGiftImageUrl('')
+    setFreeDelivery(false)
+    setDeliveryEstimate('')
+    setIsActive(true)
+    setNewShare('')
     setEditingId(null)
   }
 
   const openCreate = () => {
     resetForm()
+    setTitle(brandProfile?.full_name || '')
     setIsCreating(true)
   }
 
   const openEdit = (deal: any, event: React.MouseEvent) => {
     event.stopPropagation()
     setEditingId(deal.id)
-    setNewShare(String(deal.totalShare ?? ''))
+    setTitle(deal.title || '')
+    setPrice(deal.price === null || deal.price === undefined ? '' : String(deal.price))
+    setOriginalPrice(deal.original_price === null || deal.original_price === undefined ? '' : String(deal.original_price))
+    setDescription(deal.description || '')
+    setImageUrl(deal.image_url || '')
+    setCategory(asCategory(deal.category))
+    setStockLimit(String(deal.stock_limit ?? 0))
     setGiftDescription(deal.gift_description || '')
-    setGiftThreshold(Number(deal.gift_threshold) > 0 ? String(deal.gift_threshold) : '')
-    setGiftImageUrl(deal.gift_image_url || '')
+    setFreeDelivery(Boolean(deal.free_delivery_tbilisi))
+    setDeliveryEstimate(deal.delivery_estimate || '')
+    setIsActive(deal.is_active === true)
+    setNewShare(String(deal.totalShare ?? ''))
     setIsCreating(true)
   }
 
-  const handleGiftUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    setUploadingGift(true)
+    setUploadingImage(true)
     try {
       const fileExt = file.name.split('.').pop()
-      const filePath = `gift-images/${user.id}-${Date.now()}.${fileExt}`
+      const filePath = `deal-images/${user.id}-${Date.now()}.${fileExt}`
       const { error: uploadError } = await supabase.storage.from('logos').upload(filePath, file)
       if (uploadError) throw uploadError
       const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(filePath)
-      setGiftImageUrl(publicUrl)
+      setImageUrl(publicUrl)
     } catch (error: any) {
       alert('Matrix Upload Error: ' + error.message)
     } finally {
-      setUploadingGift(false)
+      setUploadingImage(false)
+    }
+  }
+
+  const dealFields = () => {
+    const parsedPrice = Number(price)
+    const parsedShare = Number(newShare)
+    if (!title.trim()) return { error: 'Deal title is required.', fields: null }
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) return { error: 'Price is required in GEL.', fields: null }
+    if (!Number.isFinite(parsedShare)) return { error: 'Share is required.', fields: null }
+    const parsedOriginal = originalPrice.trim() === '' ? null : Number(originalPrice)
+    if (parsedOriginal !== null && !Number.isFinite(parsedOriginal)) return { error: 'Original price must be a number.', fields: null }
+    const parsedStock = Math.max(0, Math.floor(Number(stockLimit) || 0))
+    const picture = imageUrl.trim() || null
+
+    return {
+      error: null as string | null,
+      fields: {
+        title: title.trim(),
+        price: Number(parsedPrice.toFixed(2)),
+        original_price: parsedOriginal === null ? null : Number(parsedOriginal.toFixed(2)),
+        description: description.trim() || null,
+        image_url: picture,
+        logo: picture || brandProfile?.avatar_url || '💠',
+        category,
+        stock_limit: parsedStock,
+        gift_description: giftDescription.trim() || null,
+        free_delivery_tbilisi: freeDelivery,
+        delivery_estimate: deliveryEstimate.trim() || null,
+        is_active: isActive,
+        totalShare: Math.round(parsedShare),
+      },
     }
   }
 
   const handleCreate = async () => {
-    if(!newShare) return
+    const payload = dealFields()
+    if (payload.error || !payload.fields) {
+      alert(payload.error || 'Check the deal fields.')
+      return
+    }
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
-    const giftFields = {
-      gift_description: giftDescription.trim() || null,
-      gift_threshold: Number(giftThreshold) || 0,
-      gift_image_url: giftImageUrl.trim() || null,
-    }
 
     if (editingId) {
       const { data, error } = await supabase
         .from('deals')
-        .update({ totalShare: parseInt(newShare), ...giftFields })
+        .update(payload.fields)
         .eq('id', editingId)
         .select()
         .single()
@@ -121,15 +189,12 @@ export default function BrandDealsPage() {
 
     const newDeal = {
       brand_id: user.id,
-      title: brandProfile?.full_name || 'MATRIX BRAND',
-      totalShare: parseInt(newShare), 
-      logo: brandProfile?.avatar_url || '💠',
       intel: { 
         type: brandProfile?.sector || 'Active Venture', 
         location: brandProfile?.address || 'Digital Node', 
         phone: brandProfile?.bio || 'Mission intel remains classified.' 
       },
-      ...giftFields,
+      ...payload.fields,
     }
 
     const { data, error } = await supabase.from('deals').insert([newDeal]).select().single()
@@ -170,27 +235,42 @@ export default function BrandDealsPage() {
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             className="fixed inset-0 z-[200] flex items-center justify-center p-4 backdrop-blur-md bg-black/40"
           >
-            <div className="bg-[#020502] border border-blue-500/30 rounded-[40px] p-8 md:p-10 w-full max-w-md relative shadow-2xl">
+            <div className="bg-[#020502] border border-blue-500/30 rounded-[40px] p-8 md:p-10 w-full max-w-lg relative shadow-2xl">
               <button onClick={() => { setIsCreating(false); resetForm() }} className="absolute top-6 right-6 h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-500 hover:text-white transition-all italic font-black">X</button>
-              <div className="flex flex-col items-center gap-6 max-h-[78vh] overflow-y-auto pr-1">
-                <div className="w-full space-y-4 text-center">
-                  <label className="text-[10px] font-black text-blue-500 uppercase tracking-[0.4em] italic block">Set Share (%)</label>
-                  <input value={newShare} onChange={(e)=>setNewShare(e.target.value)} type="number" placeholder="00" className="w-full bg-white/5 border border-white/10 rounded-3xl p-5 text-5xl text-white text-center focus:border-blue-500 outline-none transition-all font-black italic shadow-inner" />
+              <div className="flex flex-col gap-3 max-h-[78vh] overflow-y-auto pr-1">
+                <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.4em] italic text-center">{editingId ? 'Edit Deal' : 'New Deal'}</p>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} type="text" placeholder="Deal / bundle title" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
+                <div className="grid grid-cols-2 gap-3">
+                  <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" min="0" step="0.01" placeholder="Price GEL *" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
+                  <input value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)} type="number" min="0" step="0.01" placeholder="Original price" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
                 </div>
-                <div className="w-full space-y-3">
-                  <label className="text-[9px] font-black text-amber-300/80 uppercase tracking-[0.35em] italic block text-center">Optional Gift</label>
-                  <input value={giftDescription} onChange={(e) => setGiftDescription(e.target.value)} type="text" placeholder="Free Gift Box / Dessert" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white text-center focus:border-amber-300/50 outline-none transition-all font-bold italic" />
-                  <input value={giftThreshold} onChange={(e) => setGiftThreshold(e.target.value)} type="number" min="0" placeholder="Threshold GEL (0 = any purchase)" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white text-center focus:border-amber-300/50 outline-none transition-all font-bold italic" />
-                  <input value={giftImageUrl} onChange={(e) => setGiftImageUrl(e.target.value)} type="url" placeholder="Gift image URL" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-[11px] text-white text-center focus:border-amber-300/50 outline-none transition-all font-bold" />
-                  <label className="block w-full cursor-pointer bg-white/5 border border-dashed border-white/15 rounded-2xl py-3 text-center text-[9px] font-black uppercase tracking-[0.3em] text-gray-400 hover:text-white hover:border-amber-300/40 transition-all italic">
-                    {uploadingGift ? 'Uploading...' : giftImageUrl ? 'Replace Gift Image' : 'Upload Gift Image'}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleGiftUpload} disabled={uploadingGift} />
-                  </label>
-                  {giftImageUrl.startsWith('http') && (
-                    <img src={giftImageUrl} alt="gift" className="mx-auto h-16 w-16 rounded-2xl object-cover border border-white/10" />
-                  )}
-                </div>
-                <button onClick={handleCreate} disabled={uploadingGift} className="bg-white text-black w-full py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.4em] hover:bg-blue-600 hover:text-white transition-all italic shadow-xl active:scale-95 disabled:opacity-40">{editingId ? 'SAVE' : 'CREATE'}</button>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" rows={3} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold resize-none" />
+                <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} type="url" placeholder="Image URL" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-[11px] text-white focus:border-blue-500 outline-none font-bold" />
+                <label className="block w-full cursor-pointer bg-white/5 border border-dashed border-white/15 rounded-2xl py-3 text-center text-[9px] font-black uppercase tracking-[0.3em] text-gray-400 hover:text-white hover:border-blue-500/40 transition-all italic">
+                  {uploadingImage ? 'Uploading...' : imageUrl ? 'Replace Image' : 'Upload Image'}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploadingImage} />
+                </label>
+                {imageUrl.startsWith('http') && (
+                  <img src={imageUrl} alt="" className="mx-auto h-16 w-16 rounded-2xl object-cover border border-white/10" />
+                )}
+                <select value={category} onChange={(e) => setCategory(asCategory(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold">
+                  {CATEGORIES.map((item) => (
+                    <option key={item.value} value={item.value} className="bg-black">{item.label}</option>
+                  ))}
+                </select>
+                <input value={stockLimit} onChange={(e) => setStockLimit(e.target.value)} type="number" min="0" step="1" placeholder="Stock limit (0 = unlimited)" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
+                <input value={giftDescription} onChange={(e) => setGiftDescription(e.target.value)} type="text" placeholder="Gift description" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-amber-300/50 outline-none font-bold" />
+                <input value={deliveryEstimate} onChange={(e) => setDeliveryEstimate(e.target.value)} type="text" placeholder="Delivery estimate" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
+                <input value={newShare} onChange={(e) => setNewShare(e.target.value)} type="number" placeholder="Total share %" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
+                <label className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-white/80">
+                  Free delivery in Tbilisi
+                  <input type="checkbox" checked={freeDelivery} onChange={(e) => setFreeDelivery(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                </label>
+                <label className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-white/80">
+                  Active
+                  <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                </label>
+                <button onClick={handleCreate} disabled={uploadingImage} className="bg-white text-black w-full py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.4em] hover:bg-blue-600 hover:text-white transition-all italic shadow-xl active:scale-95 disabled:opacity-40">{editingId ? 'SAVE' : 'CREATE'}</button>
               </div>
             </div>
           </motion.div>
@@ -216,7 +296,7 @@ export default function BrandDealsPage() {
                   {deal.gift_description && (
                     <div className="absolute top-6 left-6 right-6 z-10 flex justify-center pointer-events-none">
                       <span className="max-w-full truncate px-3 py-1 rounded-full border border-amber-300/40 bg-amber-400/10 text-[8px] font-black uppercase tracking-[0.18em] text-amber-200 italic">
-                        🎁 {deal.gift_description}{Number(deal.gift_threshold) > 0 ? ` · ${Number(deal.gift_threshold)} GEL` : ''}
+                        🎁 {deal.gift_description}
                       </span>
                     </div>
                   )}
@@ -225,17 +305,20 @@ export default function BrandDealsPage() {
                   <div className="flex flex-col items-center text-center w-full mt-2">
                     {/* ✅ 20%-ით შემცირებული ლოგოს კონტეინერი */}
                     <div className="h-32 w-32 md:h-40 md:w-40 mx-auto rounded-[32px] bg-white/[0.03] border-2 border-white/10 flex items-center justify-center mb-6 shadow-lg overflow-hidden relative">
-                      {deal.logo?.startsWith('http') ? (
-                        <img src={deal.logo} alt={deal.title} className="absolute inset-0 h-full w-full object-cover filter brightness-105" />
+                      {(deal.image_url || deal.logo)?.startsWith('http') ? (
+                        <img src={deal.image_url || deal.logo} alt={deal.title} className="absolute inset-0 h-full w-full object-cover filter brightness-105" />
                       ) : (
-                        // ✅ დაპატარავებული ტექსტური ლოგო
                         <span className="text-5xl">{deal.logo}</span>
                       )}
                     </div>
-                    {/* 📝 გაზრდილი სათაური */}
                     <h3 className="text-3xl md:text-4xl font-black text-white italic uppercase tracking-tighter leading-none drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
                       {deal.title}
                     </h3>
+                    <p className="mt-3 text-[10px] font-black uppercase tracking-[0.28em] text-blue-400">
+                      {Number(deal.price) > 0 ? `${Number(deal.price).toFixed(2)} GEL` : 'No price'}
+                      {deal.category ? ` · ${deal.category}` : ''}
+                      {deal.is_active === false ? ' · inactive' : ''}
+                    </p>
                   </div>
 
                   <div className="text-center mt-auto">

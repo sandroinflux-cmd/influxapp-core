@@ -11,6 +11,10 @@ function timeAgo(dateString: string) {
   return mins + " mins ago"
 }
 
+function shortOrderId(id: string) {
+  return id.replace(/-/g, '').slice(0, 8).toUpperCase()
+}
+
 export default function LiveFeed() {
   const [liveFeed, setLiveFeed] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -24,18 +28,26 @@ export default function LiveFeed() {
 
     const { data: txs } = await supabase
       .from('transactions')
-      .select('*')
+      .select('id, created_at, influencer_earned, payout_status, deal_id, brand_id, status')
       .eq('influencer_id', user.id)
-      .eq('status', 'approved') // 🎯 გასწორდა
+      .eq('status', 'approved')
       .order('created_at', { ascending: false })
       .limit(20)
 
+    const dealIds = [...new Set((txs || []).map((tx) => tx.deal_id).filter(Boolean))]
+    const dealTitles = new Map<string, string>()
+    if (dealIds.length) {
+      const { data: deals } = await supabase.from('deals').select('id, title').in('id', dealIds)
+      deals?.forEach((deal) => dealTitles.set(deal.id, deal.title || 'Deal'))
+    }
+
     if (txs) {
       setLiveFeed(txs.map(tx => ({
-        id: `OWNER_${(tx.token_id || 'UNK').substring(0, 4).toUpperCase()}`,
+        id: shortOrderId(tx.id),
+        dealTitle: tx.deal_id ? (dealTitles.get(tx.deal_id) || 'Deal') : 'Deal',
         brand: brandMap.get(tx.brand_id)?.full_name || 'MATRIX NODE',
-        spent: Number(tx.influencer_earned).toLocaleString('en-US', { minimumFractionDigits: 2 }),
-        location: brandMap.get(tx.brand_id)?.address || 'Digital Node',
+        earned: Number(tx.influencer_earned || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }),
+        payout: tx.payout_status || '—',
         time: timeAgo(tx.created_at),
         rawId: tx.id
       })))
@@ -69,20 +81,22 @@ export default function LiveFeed() {
               className="bg-[#040d08]/60 border border-white/5 rounded-[45px] p-10 flex items-center group relative overflow-hidden hover:border-emerald-500/20 transition-colors"
             >
               <div className="w-1/4 pl-4">
-                <span className="text-[10px] text-emerald-500/40 block mb-2 tracking-widest">Tokenowner</span>
-                <span className="text-xl">{tx.id}</span>
+                <span className="text-[10px] text-emerald-500/40 block mb-2 tracking-widest">Order</span>
+                <span className="text-xl">#{tx.id}</span>
+                <span className="mt-2 block text-[10px] text-gray-600">{tx.time}</span>
               </div>
               <div className="w-1/4">
-                <span className="text-[10px] text-gray-600 block mb-2 tracking-widest">Brand</span>
-                <span className="text-xl text-white/90">{tx.brand}</span>
+                <span className="text-[10px] text-gray-600 block mb-2 tracking-widest">Deal</span>
+                <span className="text-xl text-white/90">{tx.dealTitle}</span>
+                <span className="mt-2 block text-[10px] text-gray-500">{tx.brand}</span>
               </div>
               <div className="w-1/4 text-center">
-                <span className="text-[10px] text-gray-600 block mb-2 tracking-widest">Location</span>
-                <span className="text-sm text-gray-400">{tx.location}</span>
+                <span className="text-[10px] text-gray-600 block mb-2 tracking-widest">Payout</span>
+                <span className="text-sm text-gray-300">{tx.payout}</span>
               </div>
               <div className="w-1/4 text-right">
-                <span className="text-[10px] text-emerald-500/60 block mb-2 tracking-widest">Your Profit</span>
-                <span className="text-3xl text-emerald-500">{tx.spent} ₾</span>
+                <span className="text-[10px] text-emerald-500/60 block mb-2 tracking-widest">Earned</span>
+                <span className="text-3xl text-emerald-500">{tx.earned} ₾</span>
               </div>
             </motion.div>
           ))}

@@ -26,7 +26,7 @@ export default async function AdminDashboard(props: any) {
   if (!user) redirect('/')
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'superadmin') redirect('/wallet')
+  if (profile?.role !== 'superadmin') redirect('/')
 
   // 🚨 3. Pending ექაუნთები
   const { data: pendingUsers } = await supabase.from('profiles').select('*').eq('account_status', 'pending').neq('role', 'superadmin')

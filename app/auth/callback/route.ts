@@ -2,12 +2,30 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+const FALLBACK_NEXT = '/dashboard'
+
+function safeNextPath(next: string | null): string {
+  if (!next || !next.startsWith('/') || next.startsWith('//')) return FALLBACK_NEXT
+  if (next.includes('\\') || next.includes('://')) return FALLBACK_NEXT
+  if (/[a-zA-Z][a-zA-Z\d+\-.]*:/.test(next)) return FALLBACK_NEXT
+
+  try {
+    const base = new URL('https://influx.invalid')
+    const resolved = new URL(next, base)
+    if (resolved.origin !== base.origin) return FALLBACK_NEXT
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`
+  } catch {
+    return FALLBACK_NEXT
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   
-  // საით უნდა გავუშვათ იუზერი ლოგინის მერე
-  const next = searchParams.get('next') ?? '/'
+  // საით უნდა გავუშვათ იუზერი ლოგინის მერე. არასწორი next ბრუნდება დეშბორდზე.
+  const requestedNext = searchParams.get('next')
+  const next = requestedNext == null ? '/' : safeNextPath(requestedNext)
 
   if (code) {
     const cookieStore = await cookies()

@@ -1,199 +1,281 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { getBogToken } from '@/lib/bog'
+import { compactPhone, isGeorgianMobilePhone } from '@/lib/phone'
 
-// 🔐 1. ფუნქცია: BOG Token-ის გენერაცია
-async function getBogToken() {
-  const clientId = process.env.BOG_CLIENT_ID
-  const secretKey = process.env.BOG_SECRET_KEY
-  
-  if (!clientId || !secretKey) {
-    throw new Error('BOG Credentials are missing in environment variables')
-  }
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-  const authString = Buffer.from(`${clientId}:${secretKey}`).toString('base64')
+const CITIES = new Set(['თბილისი', 'რეგიონი'])
 
-  const response = await fetch('https://oauth2.bog.ge/auth/realms/bog/protocol/openid-connect/token', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${authString}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: 'grant_type=client_credentials'
-  })
-
-  if (!response.ok) {
-    const errorData = await response.text()
-    console.error('BOG Token Fetch Error:', errorData)
-    throw new Error('Failed to authenticate with BOG')
-  }
-  
-  const data = await response.json()
-  return data.access_token
+function adminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error('Server configuration error')
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 }
 
-// 📦 2. ფუნქცია: BOG Order-ის შექმნა (დამატებულია Split ლოგიკა!)
-async function createBogOrder(token: string, txId: string, amount: number, splits: any[]) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
-  const finalPayable = Number(amount.toFixed(2));
+function bad(error: string, status = 400) {
+  return NextResponse.json({ error }, { status })
+}
 
-  // ძირითადი შეკვეთის სტრუქტურა
+function readText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function sanitizeIban(iban?: string | null) {
+  return (iban || '').replace(/\s+/g, '').toUpperCase()
+}
+
+function isGeorgianIban(iban: string) {
+  return /^GE[0-9A-Z]{20}$/.test(iban)
+}
+
+async function createBogOrder(
+  token: string,
+  txId: string,
+  amount: number,
+  splits: Array<{ amount: number; iban: string; description: string }>,
+  productId: string,
+  description: string,
+  failQuery: string
+) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const finalPayable = Number(amount.toFixed(2))
+
   const requestBody: any = {
-    callback_url: `${siteUrl}/api/payments/callback`, 
-    external_order_id: txId, 
+    callback_url: `${siteUrl}/api/payments/callback`,
+    external_order_id: txId,
     purchase_units: {
       currency: 'GEL',
       total_amount: finalPayable,
       basket: [
         {
-          product_id: "INFLUX-QR",
-          description: "INFLUX Payment", // შემოკლებული აღწერა
+          product_id: productId,
+          description: description.slice(0, 50) || 'INFLUX Payment',
           quantity: 1,
-          unit_price: finalPayable
-        }
-      ]
+          unit_price: finalPayable,
+        },
+      ],
     },
     redirect_urls: {
-      success: `${siteUrl}/payment/success?txid=${txId}`, 
-      fail: `${siteUrl}/payment/fail?txid=${txId}`
-    }
-  };
+      success: `${siteUrl}/payment/success?txid=${txId}`,
+      fail: `${siteUrl}/payment/fail?${failQuery}`,
+    },
+  }
 
-  // 🚀 თუ IBAN-ები მოიძებნა, ვამატებთ Split-ს
+  // Approved merchant split payload. Amounts are server-computed; the shape stays the same.
   if (splits && splits.length > 0) {
     requestBody.config = {
       split: {
-        split_payments: splits
-      }
-    };
+        split_payments: splits,
+      },
+    }
   }
 
   const response = await fetch('https://api.bog.ge/payments/v1/ecommerce/orders', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Accept-Language': 'ka',
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
     },
-    body: JSON.stringify(requestBody)
+    body: JSON.stringify(requestBody),
+    cache: 'no-store',
   })
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))
-    console.error("❌ BOG Order Creation Error:", JSON.stringify(errorData, null, 2))
-    throw new Error(`BOG Rejected: ${errorData?.error_message || errorData?.message || 'Check Vercel Logs'}`)
+    console.error('BOG Order Creation Error:', errorData?.error_message || errorData?.message || response.status)
+    throw new Error(`BOG Rejected: ${errorData?.error_message || errorData?.message || 'Check server logs'}`)
   }
 
-  return await response.json()
+  return response.json()
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const { 
-      amount, 
-      finalAmount, 
-      brandId, 
-      influencerId, 
-      dealId,
-      discountPercent,
-      commissionPercent,
-      brandEarned,
-      influencerEarned
-    } = body
-
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { getAll() { return cookieStore.getAll() } } }
-    )
-
-    // 🚀 1. ამოგვაქვს IBAN-ები Profiles ცხრილიდან
-    const { data: brandProf } = await supabase.from('profiles').select('iban').eq('id', brandId).single()
-    const { data: influProf } = await supabase.from('profiles').select('iban').eq('id', influencerId).single()
-
-    const sanitizeIban = (iban?: string | null) => (iban || '').replace(/\s+/g, '').toUpperCase()
-    const roundMoney = (value: number) => Number(Number(value || 0).toFixed(2))
-
-    const brandIban = sanitizeIban(brandProf?.iban);
-    const influencerIban = sanitizeIban(influProf?.iban);
-    const roundedBrandEarned = roundMoney(brandEarned)
-    const roundedInfluencerEarned = roundMoney(influencerEarned)
-    const roundedAmount = roundMoney(amount)
-    const roundedFinalAmount = roundMoney(finalAmount)
-
-    let serverGiftUnlocked = false
-    let serverGiftDescription: string | null = null
-    if (dealId) {
-      const { data: giftDeal } = await supabase
-        .from('deals')
-        .select('gift_description, gift_threshold')
-        .eq('id', dealId)
-        .maybeSingle()
-      const giftThreshold = Number(giftDeal?.gift_threshold || 0)
-      serverGiftUnlocked = Boolean(giftDeal?.gift_description)
-        && roundedFinalAmount > 0
-        && (giftThreshold <= 0 || roundedFinalAmount >= giftThreshold)
-      serverGiftDescription = serverGiftUnlocked ? giftDeal?.gift_description || null : null
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
     }
 
-    // 🛡️ 2. ვამზადებთ Split მასივს ბანკისთვის (მხოლოდ ვალიდური თანხებისთვის და IBAN-ებისთვის)
-    const splitPayments = [];
-    
-    if (brandIban && roundedBrandEarned > 0) {
+    let body: any
+    try {
+      body = await request.json()
+    } catch {
+      return bad('Invalid JSON')
+    }
+
+    const dealId = readText(body?.dealId)
+    const influencerId = readText(body?.influencerId)
+    const customerName = readText(body?.customerName)
+    const customerPhone = readText(body?.customerPhone)
+    const customerCity = readText(body?.customerCity)
+    const customerAddress = readText(body?.customerAddress)
+    const deliveryNote = readText(body?.deliveryNote)
+    const marketingOptIn = body?.marketingOptIn === true
+
+    if (!dealId) return bad('dealId is required')
+    if (customerName.length < 2 || customerName.length > 120) return bad('Invalid customerName')
+    if (!isGeorgianMobilePhone(customerPhone)) return bad('Invalid phone')
+    if (!CITIES.has(customerCity)) return bad('Invalid customerCity')
+    if (!customerAddress || customerAddress.length > 400) return bad('Invalid customerAddress')
+    if (deliveryNote.length > 400) return bad('Invalid deliveryNote')
+
+    const supabase = adminClient()
+
+    const { data: deal, error: dealError } = await supabase
+      .from('deals')
+      .select('*')
+      .eq('id', dealId)
+      .maybeSingle()
+
+    if (dealError) throw dealError
+    if (!deal) return bad('Deal not found', 404)
+
+    let partnershipQuery = supabase
+      .from('partnerships')
+      .select('*')
+      .eq('deal_id', dealId)
+      .eq('status', 'active')
+
+    if (influencerId) partnershipQuery = partnershipQuery.eq('influencer_id', influencerId)
+
+    const { data: partnerships, error: partnershipError } = await partnershipQuery.limit(2)
+    if (partnershipError) throw partnershipError
+    if (!partnerships || partnerships.length === 0) return bad('Active partnership required')
+    if (!influencerId && partnerships.length > 1) return bad('influencerId required')
+
+    const partnership = partnerships[0]
+    const finalAmount = Number(Number(deal.price).toFixed(2))
+    const billAmount = Number(Number(deal.original_price || deal.price).toFixed(2))
+    const stockLimit = Number(deal.stock_limit || 0)
+    const stockSold = Number(deal.stock_sold || 0)
+    const inStock = !deal.stock_limit || stockLimit === 0 || stockSold < stockLimit
+
+    if (deal.is_active !== true || !inStock) {
+      return NextResponse.json({ error: 'SOLD_OUT' }, { status: 409 })
+    }
+    if (!(finalAmount > 0)) return bad('Invalid deal price')
+
+    const commissionPct = Number(partnership?.influencer_cut_pct || 0)
+    const totalPct = Number(partnership?.total_percentage ?? deal.totalShare ?? 0)
+    const influencerEarned = Number(((finalAmount * commissionPct) / 100).toFixed(2))
+    const platformCutPct = Math.max(0, totalPct - commissionPct)
+    const systemFee = Number(((finalAmount * platformCutPct) / 100).toFixed(2))
+    const brandEarned = Number((finalAmount - influencerEarned - systemFee).toFixed(2))
+
+    if (brandEarned < 0 || influencerEarned < 0 || systemFee < 0) {
+      return bad('Invalid split')
+    }
+
+    const [{ data: brand }, { data: influencer }] = await Promise.all([
+      supabase.from('profiles').select('id, full_name, iban').eq('id', deal.brand_id).maybeSingle(),
+      supabase.from('profiles').select('id, full_name, iban').eq('id', partnership.influencer_id).maybeSingle(),
+    ])
+
+    const brandIban = sanitizeIban(brand?.iban)
+    const influencerIban = sanitizeIban(influencer?.iban)
+
+    const brandNeedsSplit = brandEarned > 0
+    const influencerNeedsSplit = influencerEarned > 0
+    const brandLegAdded = brandNeedsSplit && isGeorgianIban(brandIban)
+    const influencerLegAdded = influencerNeedsSplit && isGeorgianIban(influencerIban)
+
+    const splitPayments: Array<{ amount: number; iban: string; description: string }> = []
+    if (brandLegAdded) {
       splitPayments.push({
-        amount: Number(roundedBrandEarned.toFixed(2)),
+        amount: Number(brandEarned.toFixed(2)),
         iban: brandIban,
-        description: "InfluX Brand Payout" // BOG წესი: მაქს 25 სიმბოლო
-      });
+        description: 'InfluX Brand Payout',
+      })
     }
-
-    if (influencerIban && roundedInfluencerEarned > 0) {
+    if (influencerLegAdded) {
       splitPayments.push({
-        amount: Number(roundedInfluencerEarned.toFixed(2)),
+        amount: Number(influencerEarned.toFixed(2)),
         iban: influencerIban,
-        description: "InfluX Partner Payout" // BOG წესი: მაქს 25 სიმბოლო
-      });
+        description: 'InfluX Partner Payout',
+      })
     }
 
-    // 🛡️ 3. ვქმნით ტრანზაქციას ჩვენს ბაზაში (Pending)
+    const requiredLegs = Number(brandNeedsSplit) + Number(influencerNeedsSplit)
+    const addedLegs = Number(brandLegAdded) + Number(influencerLegAdded)
+    const payoutStatus = requiredLegs > 0 && addedLegs === requiredLegs
+      ? 'split_sent'
+      : addedLegs > 0
+        ? 'partial_split'
+        : 'held'
+    const discountPercent = billAmount > finalAmount && billAmount > 0
+      ? Number((((billAmount - finalAmount) / billAmount) * 100).toFixed(2))
+      : 0
+    const phone = compactPhone(customerPhone)
+
     const { data: tx, error: txError } = await supabase
       .from('transactions')
       .insert([{
-        bill_amount: roundedAmount,
-        final_amount: roundedFinalAmount,
-        amount: roundedAmount, 
-        brand_id: brandId,
-        influencer_id: influencerId,
-        deal_id: dealId,
+        bill_amount: Number(billAmount.toFixed(2)),
+        final_amount: Number(finalAmount.toFixed(2)),
+        amount: Number(billAmount.toFixed(2)),
+        brand_id: deal.brand_id,
+        influencer_id: partnership.influencer_id,
+        deal_id: deal.id,
         discount_percent: discountPercent,
-        commission_percent: commissionPercent,
-        brand_earned: roundedBrandEarned,
-        influencer_earned: roundedInfluencerEarned,
+        commission_percent: commissionPct,
+        brand_earned: brandEarned,
+        influencer_earned: influencerEarned,
+        system_fee: systemFee,
         brand_iban: brandIban || '',
         influencer_iban: influencerIban || '',
         status: 'pending',
-        system_fee: roundMoney(roundedFinalAmount - roundedBrandEarned - roundedInfluencerEarned),
-        gift_unlocked: serverGiftUnlocked,
-        gift_description: serverGiftDescription,
+        fulfillment_status: 'pending',
+        payout_status: payoutStatus,
+        category: deal.category ?? null,
+        customer_name: customerName,
+        customer_phone: phone,
+        customer_city: customerCity,
+        customer_address: customerAddress,
+        delivery_note: deliveryNote || null,
+        marketing_opt_in: marketingOptIn,
+        gift_unlocked: Boolean(deal.gift_description),
+        gift_description: deal.gift_description || null,
       }])
       .select()
       .single()
 
     if (txError) throw txError
 
-    // 🏦 4. ბანკის API-სთან დაკავშირება და შეკვეთის შექმნა
+    const failParams = new URLSearchParams({ txid: tx.id, deal: deal.id })
+    if (partnership.influencer_id) failParams.set('ref', partnership.influencer_id)
+
     const bogToken = await getBogToken()
-    
-    // გადავცემთ splitPayments მასივს
-    const bogOrder = await createBogOrder(bogToken, tx.id, roundedFinalAmount, splitPayments)
+    const bogOrder = await createBogOrder(
+      bogToken,
+      tx.id,
+      finalAmount,
+      splitPayments,
+      deal.id,
+      deal.title || 'INFLUX Payment',
+      failParams.toString()
+    )
 
-    const bankCheckoutUrl = bogOrder._links.redirect.href
-    return NextResponse.json({ checkoutUrl: bankCheckoutUrl })
+    const bogOrderId = bogOrder?.id || bogOrder?.order_id
+    if (!bogOrderId) throw new Error('BOG order id missing')
 
+    const { error: bogIdError } = await supabase
+      .from('transactions')
+      .update({ bog_order_id: bogOrderId })
+      .eq('id', tx.id)
+
+    if (bogIdError) throw bogIdError
+
+    const checkoutUrl = bogOrder?._links?.redirect?.href
+    if (!checkoutUrl) throw new Error('BOG checkout URL missing')
+
+    return NextResponse.json({ checkoutUrl })
   } catch (error: any) {
-    console.error("API Payment Initiation Error:", error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const message = error?.message || 'Payment initiation failed'
+    const status = /invalid input syntax/i.test(message) ? 400 : 500
+    console.error('API Payment Initiation Error:', message)
+    return NextResponse.json({ error: message }, { status })
   }
 }

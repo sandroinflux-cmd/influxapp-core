@@ -9,6 +9,8 @@ export default function InfluencerSettingsPage() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [handle, setHandle] = useState('')
+  const [username, setUsername] = useState('')
+  const [usernameError, setUsernameError] = useState<string | null>(null)
   const [iban, setIban] = useState('')
   const [instagram, setInstagram] = useState('')
   const [tiktok, setTiktok] = useState('')
@@ -25,12 +27,13 @@ export default function InfluencerSettingsPage() {
         setUserId(user.id)
         const { data } = await supabase
           .from('profiles')
-          .select('full_name, avatar_url, iban, bio')
+          .select('full_name, avatar_url, iban, bio, username')
           .eq('id', user.id)
           .single()
 
         if (data) {
           setHandle(data.full_name || '')
+          setUsername(data.username || '')
           setIban(data.iban || '')
           if (data.avatar_url) {
             setAvatarUrl(data.avatar_url); setAvatarPreview(data.avatar_url);
@@ -68,19 +71,51 @@ export default function InfluencerSettingsPage() {
     }
   }
 
+  const validateUsername = (value: string) => {
+    if (!value) return null
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) || value.length > 32) {
+      return 'Use a lowercase URL slug: letters, numbers, and single hyphens.'
+    }
+    const reserved = new Set(['pay', 'claim', 'payment', 'dashboard', 'signup', 'admin', 'wallet', 'privacy', 'terms', 'monitor', 'auth', 'api', 'login'])
+    if (reserved.has(value)) return 'This username is reserved.'
+    return null
+  }
+
   const handleCommit = async () => {
     if (!userId) return
     setIsSaving(true)
+    setUsernameError(null)
     
-    // 🚀 IBAN-ის გასუფთავება
     const cleanIban = iban.replace(/\s+/g, '').toUpperCase();
     const socialsJson = JSON.stringify({ instagram, tiktok, youtube })
+    const slug = username.trim().toLowerCase()
+    const slugError = validateUsername(slug)
+    if (slugError) {
+      setUsernameError(slugError)
+      setIsSaving(false)
+      return
+    }
 
     try {
+      if (slug) {
+        const { data: existing, error: lookupError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', slug)
+          .maybeSingle()
+        if (lookupError) throw lookupError
+        if (existing && existing.id !== userId) {
+          setUsernameError('This username is already taken.')
+          setIsSaving(false)
+          return
+        }
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({ 
           full_name: handle,
+          username: slug || null,
           avatar_url: avatarUrl,
           iban: cleanIban,
           bio: socialsJson
@@ -88,6 +123,7 @@ export default function InfluencerSettingsPage() {
         .eq('id', userId)
 
       if (error) throw error
+      setUsername(slug)
       setIban(cleanIban);
       alert("PROTOCOL COMMITTED 🦾")
     } catch (error: any) {
@@ -130,6 +166,26 @@ export default function InfluencerSettingsPage() {
             <div className="group">
               <label className="text-[9px] text-gray-600 uppercase font-black tracking-[0.3em] mb-4 block italic">Operator Handle</label>
               <input type="text" value={handle} onChange={(e) => setHandle(e.target.value)} className="w-full bg-white/[0.02] border border-white/5 rounded-3xl p-5 text-sm font-black focus:border-emerald-500/30 outline-none transition-all uppercase italic tracking-widest" />
+            </div>
+            <div className="group">
+              <label className="text-[9px] text-gray-600 uppercase font-black tracking-[0.3em] mb-4 block italic">Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value.toLowerCase())
+                  setUsernameError(null)
+                }}
+                placeholder="your-name"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className="w-full bg-white/[0.02] border border-white/5 rounded-3xl p-5 text-sm font-black focus:border-emerald-500/30 outline-none transition-all lowercase tracking-widest"
+              />
+              <p className="mt-3 text-[10px] font-bold normal-case tracking-normal text-white/40">
+                Lowercase letters, numbers, and hyphens. This becomes /{username.trim().toLowerCase() || 'username'}.
+              </p>
+              {usernameError && <p className="mt-2 text-[10px] font-bold normal-case tracking-normal text-red-400">{usernameError}</p>}
             </div>
             <div className="group pt-6 border-t border-white/5">
               <label className="text-[9px] text-emerald-500 uppercase font-black tracking-[0.3em] mb-4 block italic">Financial Node (IBAN)</label>

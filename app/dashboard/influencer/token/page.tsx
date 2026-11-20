@@ -5,8 +5,19 @@ import { supabase } from '@/lib/supabase'
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion'
 
 // ✅ GridDealCard (უცვლელია)
-function GridDealCard({ deal }: { deal: any }) {
+function GridDealCard({ deal, influencerId }: { deal: any; influencerId: string }) {
   const [isGridCardFlipped, setIsGridCardFlipped] = useState(false)
+  const [storyCopied, setStoryCopied] = useState(false)
+
+  const copyStoryLink = (event: React.MouseEvent) => {
+    event.stopPropagation()
+    if (!deal.dealId || !influencerId) return
+    const url = `${window.location.origin}/pay?deal=${deal.dealId}&ref=${influencerId}`
+    navigator.clipboard.writeText(url).then(() => {
+      setStoryCopied(true)
+      window.setTimeout(() => setStoryCopied(false), 2000)
+    }).catch(() => {})
+  }
   
   return (
     <motion.div 
@@ -37,9 +48,16 @@ function GridDealCard({ deal }: { deal: any }) {
           {deal.offer}
         </h2>
         
-        <div className="text-[6px] text-gray-700 text-center tracking-[0.3em] uppercase font-black italic opacity-0 group-hover/deal:opacity-100 transition-opacity relative z-10 pb-1">
-          Tap to INSPECT
-        </div>
+        {deal.dealId && (
+          <button
+            type="button"
+            onClick={copyStoryLink}
+            onPointerDown={(event) => event.stopPropagation()}
+            className="relative z-10 w-full rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-2 py-2 text-[7px] font-black uppercase tracking-[0.12em] text-emerald-300"
+          >
+            {storyCopied ? 'Copied' : 'Copy Direct Story Link'}
+          </button>
+        )}
       </div>
 
       <div 
@@ -73,7 +91,7 @@ function GridDealCard({ deal }: { deal: any }) {
 export default function TokenForge() {
   const [isFlipped, setIsFlipped] = useState(false)
   const [liveDeals, setLiveDeals] = useState<any[]>([])
-  const [profile, setProfile] = useState<{ id: string; full_name: string; avatar_url: string } | null>(null)
+  const [profile, setProfile] = useState<{ id: string; full_name: string; avatar_url: string; username: string | null } | null>(null)
   const [isProfileLoading, setIsProfileLoading] = useState(true)
   const [isCopied, setIsCopied] = useState(false)
   const [tokenStats, setTokenStats] = useState({ views: 0, flips: 0, claims: 0, limit: 0 })
@@ -96,14 +114,14 @@ export default function TokenForge() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const fullSelect = 'id, full_name, avatar_url, token_limit, token_views, token_flips, token_claims'
+      const fullSelect = 'id, full_name, avatar_url, username, token_limit, token_views, token_flips, token_claims'
       let { data: profData, error: profError } = await supabase.from('profiles').select(fullSelect).eq('id', user.id).single()
       if (profError) {
-        const fallback = await supabase.from('profiles').select('id, full_name, avatar_url').eq('id', user.id).single()
+        const fallback = await supabase.from('profiles').select('id, full_name, avatar_url, username').eq('id', user.id).single()
         profData = fallback.data as any
       }
       if (profData) {
-        setProfile({ id: profData.id, full_name: profData.full_name, avatar_url: profData.avatar_url })
+        setProfile({ id: profData.id, full_name: profData.full_name, avatar_url: profData.avatar_url, username: profData.username || null })
         const limit = Number(profData.token_limit || 0)
         setTokenStats({
           views: Number(profData.token_views || 0),
@@ -118,14 +136,20 @@ export default function TokenForge() {
       const { data: dealsData } = await supabase.from('partnerships').select('*, deals(*)').eq('influencer_id', user.id)
       if (dealsData) {
         const pushedDeals = dealsData.filter((d: any) => d.is_pushed_to_token === true)
-        setLiveDeals(pushedDeals.map((d: any, i: number) => ({
+        setLiveDeals(pushedDeals.map((d: any, i: number) => {
+          const price = Number(d.deals?.price || 0)
+          const original = Number(d.deals?.original_price || 0)
+          const off = original > price ? Math.round((1 - price / original) * 100) : 0
+          return {
           id: d.id || i,
+          dealId: d.deal_id || d.deals?.id || null,
           brand: d.deals?.title || 'MATRIX NODE',
-          offer: `${d.user_discount_pct || 0}% OFF`,
+          offer: `${off}% OFF`,
           logo: d.deals?.logo || '💎',
           backIntelPhone: d.deals?.intel?.phone || 'Secret Node',
-          intel: d.deals?.intel || {} 
-        })))
+          intel: d.deals?.intel || {}
+          }
+        }))
       }
     } catch (err: any) { console.error(err) }
   }
@@ -167,7 +191,9 @@ export default function TokenForge() {
 
   const handleDeployLink = () => {
     if (!profile) return
-    const deployUrl = `${window.location.origin}/claim?ref=${profile.id}`
+    const deployUrl = profile.username
+      ? `${window.location.origin}/${profile.username}`
+      : `${window.location.origin}/claim?ref=${profile.id}`
     navigator.clipboard.writeText(deployUrl)
     setIsCopied(true)
     setTimeout(() => setIsCopied(false), 3000)
@@ -273,7 +299,7 @@ export default function TokenForge() {
               <div className="h-full overflow-y-auto custom-token-scrollbar pr-4">
                 <div className="grid grid-cols-2 gap-3 pb-8">
                   {liveDeals.length > 0 ? liveDeals.map((deal) => (
-                      <GridDealCard key={deal.id} deal={deal} />
+                      <GridDealCard key={deal.id} deal={deal} influencerId={profile?.id || ''} />
                   )) : (
                     <div className="col-span-2 py-40 text-center opacity-20 italic font-black uppercase">
                       <p className="text-[11px] tracking-widest">No Sync Detected</p>

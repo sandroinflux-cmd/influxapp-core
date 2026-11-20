@@ -1,73 +1,80 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { verifyBogTransaction } from '@/lib/verifyBogTransaction'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+function adminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  )
+}
+
+function asText(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : ''
+}
 
 export async function POST(request: Request) {
   try {
-    const text = await request.text()
-    const payload = text ? JSON.parse(text) : {}
-    
-    console.log("💳 BOG Callback Received:", JSON.stringify(payload, null, 2))
-
-    const eventData = payload.body || payload; 
-
-    const bogStatus = eventData.order_status?.key || eventData.status;
-    const txId = eventData.external_order_id || eventData.order_id || eventData.shop_order_id
-
-    // 🚀 ვაანალიზებთ Split ობიექტს
-    if (eventData.split) {
-      console.log(`🔀 Split Status: ${eventData.split.split_status}`);
-      if (eventData.split.split_reject_reason) {
-        console.error(`⚠️ BOG Split Rejected: ${eventData.split.split_reject_reason}`);
-      }
+    let payload: any = {}
+    try {
+      const text = await request.text()
+      payload = text ? JSON.parse(text) : {}
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
     }
 
-    if (!txId) {
-      console.error("❌ Callback Error: Missing transaction ID in payload")
-      return NextResponse.json({ error: "Missing transaction ID" }, { status: 400 })
+    const eventData = payload?.body || payload || {}
+    const externalId = asText(eventData.external_order_id) || asText(eventData.shop_order_id)
+    const payloadOrderId = asText(eventData.order_id) || asText(eventData.id)
+
+    if (!externalId && !payloadOrderId) {
+      return NextResponse.json({ error: 'Missing transaction ID' }, { status: 400 })
     }
 
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error("🚨 CRITICAL ERROR: SUPABASE_SERVICE_ROLE_KEY is missing in Vercel Environment Variables!")
-      return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 })
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ error: 'Server Configuration Error' }, { status: 500 })
     }
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY! 
-    )
+    const supabase = adminClient()
 
-    let newStatus = 'pending'
-    const normalizedStatus = bogStatus?.toLowerCase() || '';
-
-    if (normalizedStatus === 'completed' || normalizedStatus === 'success' || normalizedStatus === 'approved') {
-      newStatus = 'approved'
-    } else if (normalizedStatus === 'error' || normalizedStatus === 'rejected' || normalizedStatus === 'failed') {
-      newStatus = 'rejected'
+    let tx: any = null
+    if (externalId) {
+      const byId = await supabase.from('transactions').select('*').eq('id', externalId).maybeSingle()
+      if (byId.error && !/invalid input syntax/i.test(byId.error.message || '')) throw byId.error
+      tx = byId.data
+    }
+    if (!tx && payloadOrderId) {
+      const byBog = await supabase.from('transactions').select('*').eq('bog_order_id', payloadOrderId).maybeSingle()
+      if (byBog.error && !/column|schema cache/i.test(byBog.error.message || '')) throw byBog.error
+      tx = byBog.data
     }
 
-    console.log(`🔄 Updating TX: ${txId} to status: '${newStatus}'`)
+    if (!tx) return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+    if (tx.status === 'approved') return NextResponse.json({ message: 'OK' }, { status: 200 })
+    if (!tx.bog_order_id) return NextResponse.json({ error: 'Missing bank order id' }, { status: 409 })
 
-    const { data, error: updateError } = await supabaseAdmin
-      .from('transactions')
-      .update({ status: newStatus })
-      .eq('id', txId)
-      .select()
+    const result = await verifyBogTransaction(supabase, tx)
 
-    if (updateError) {
-      console.error("❌ Supabase Update Error:", updateError.message)
-      throw updateError
+    if (result.outcome === 'order_mismatch') {
+      return NextResponse.json({ error: 'Order mismatch' }, { status: 409 })
+    }
+    if (result.outcome === 'amount_mismatch') {
+      return NextResponse.json({ error: 'Amount mismatch' }, { status: 409 })
+    }
+    if (result.outcome === 'missing_order') {
+      return NextResponse.json({ error: 'Missing bank order id' }, { status: 409 })
+    }
+    if (result.outcome === 'already_approved') {
+      return NextResponse.json({ message: 'OK' }, { status: 200 })
     }
 
-    if (!data || data.length === 0) {
-      console.error("⚠️ Warning: Update ran, but no transaction was found with ID:", txId)
-    } else {
-      console.log("✅ DB Update Success! Transaction Approved.")
-    }
-
-    return NextResponse.json({ message: "Callback processed successfully" }, { status: 200 })
-
+    return NextResponse.json({ message: 'Callback processed successfully' }, { status: 200 })
   } catch (error: any) {
-    console.error("❌ Critical Webhook Error:", error.message)
-    return NextResponse.json({ error: "Server Error" }, { status: 500 })
+    console.error('Webhook error:', error?.message || 'Server Error')
+    return NextResponse.json({ error: 'Server Error' }, { status: 500 })
   }
 }
