@@ -8,7 +8,7 @@ import { trackTokenEvent } from '@/lib/trackTokenEvent'
 function priceOffPct(deal: any) {
   const price = Number(deal?.price || 0)
   const original = Number(deal?.original_price || 0)
-  return original > price ? Math.round((1 - price / original) * 100) : 0
+  return original > price && price > 0 ? Math.round(((original - price) / original) * 100) : 0
 }
 
 function formatOffer(deal: any) {
@@ -73,6 +73,12 @@ function ClaimContent() {
           brand: deal?.title || 'MATRIX NODE',
           offer: formatOffer(deal),
           logo: deal?.image_url || deal?.logo || '💎',
+          price: deal?.price ?? null,
+          original_price: deal?.original_price ?? null,
+          gift_description: deal?.gift_description ?? null,
+          stock_limit: deal?.stock_limit ?? null,
+          stock_sold: deal?.stock_sold ?? null,
+          is_active: deal?.is_active ?? null,
           backIntelPhone: deal?.description || deal?.intel?.phone || 'Secret Node',
           intel: deal?.intel || {},
         }]

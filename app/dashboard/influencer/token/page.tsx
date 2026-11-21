@@ -2,7 +2,21 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion'
+import { DealValueMark } from '@/components/InfluXCard'
+import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
+
+function formatOffer(deal: any) {
+  const price = Number(deal?.price || 0)
+  const original = Number(deal?.original_price || 0)
+  const limit = Number(deal?.stock_limit || 0)
+  const sold = Number(deal?.stock_sold || 0)
+  const exhausted = deal?.is_active === false || (limit > 0 && sold >= limit)
+  if (exhausted) return 'SOLD'
+  const off = original > price && price > 0 ? Math.round(((original - price) / original) * 100) : 0
+  if (off > 0) return `${off}% OFF`
+  if (price > 0) return Number.isInteger(price) ? `${price}₾` : `${price.toFixed(2)}₾`
+  return 'PAY'
+}
 
 // ✅ GridDealCard (უცვლელია)
 function GridDealCard({ deal, influencerId }: { deal: any; influencerId: string }) {
@@ -44,9 +58,7 @@ function GridDealCard({ deal, influencerId }: { deal: any; influencerId: string 
             </h3>
         </div>
         
-        <h2 className="text-4xl text-center py-2 text-emerald-500 text-glow leading-none relative z-10 tracking-tighter uppercase font-black italic">
-          {deal.offer}
-        </h2>
+        <DealValueMark deal={deal} />
         
         {deal.dealId && (
           <button
@@ -133,21 +145,28 @@ export default function TokenForge() {
       }
       setIsProfileLoading(false)
 
-      const { data: dealsData } = await supabase.from('partnerships').select('*, deals(*)').eq('influencer_id', user.id)
+      const { data: dealsData } = await supabase
+        .from('partnerships')
+        .select('*, deals(id, title, logo, price, original_price, gift_description, intel, stock_limit, stock_sold, is_active)')
+        .eq('influencer_id', user.id)
       if (dealsData) {
         const pushedDeals = dealsData.filter((d: any) => d.is_pushed_to_token === true)
         setLiveDeals(pushedDeals.map((d: any, i: number) => {
-          const price = Number(d.deals?.price || 0)
-          const original = Number(d.deals?.original_price || 0)
-          const off = original > price ? Math.round((1 - price / original) * 100) : 0
+          const row = d.deals || {}
           return {
-          id: d.id || i,
-          dealId: d.deal_id || d.deals?.id || null,
-          brand: d.deals?.title || 'MATRIX NODE',
-          offer: `${off}% OFF`,
-          logo: d.deals?.logo || '💎',
-          backIntelPhone: d.deals?.intel?.phone || 'Secret Node',
-          intel: d.deals?.intel || {}
+            id: d.id || i,
+            dealId: d.deal_id || row.id || null,
+            brand: row.title || 'MATRIX NODE',
+            offer: formatOffer(row),
+            logo: row.logo || '💎',
+            price: row.price ?? null,
+            original_price: row.original_price ?? null,
+            gift_description: row.gift_description ?? null,
+            stock_limit: row.stock_limit ?? null,
+            stock_sold: row.stock_sold ?? null,
+            is_active: row.is_active ?? null,
+            backIntelPhone: row.intel?.phone || 'Secret Node',
+            intel: row.intel || {},
           }
         }))
       }

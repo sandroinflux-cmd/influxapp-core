@@ -3,7 +3,60 @@
 import { useState } from 'react'
 import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
 
-// ✅ განახლებული GridDealCard Intel-ის მხარდაჭერით
+function buyerDealMark(deal: any): { kind: 'discount'; pct: number } | { kind: 'gift'; text: string } | null {
+  const limit = Number(deal?.stock_limit || 0)
+  const sold = Number(deal?.stock_sold || 0)
+  if (deal?.offer === 'SOLD' || deal?.is_active === false || (limit > 0 && sold >= limit)) return null
+
+  const price = Number(deal?.price)
+  const originalPrice = Number(deal?.original_price)
+  const discounted = Number.isFinite(originalPrice) && Number.isFinite(price) && originalPrice > price && price > 0
+  if (discounted) {
+    const discountPct = Math.round(((originalPrice - price) / originalPrice) * 100)
+    return discountPct > 0 ? { kind: 'discount', pct: discountPct } : null
+  }
+
+  const gift = typeof deal?.gift_description === 'string' ? deal.gift_description.trim() : ''
+  return gift ? { kind: 'gift', text: gift } : null
+}
+
+export function DealValueMark({ deal }: { deal: any }) {
+  const mark = buyerDealMark(deal)
+
+  if (mark?.kind === 'discount') {
+    return (
+      <div className="relative z-10 flex w-full min-w-0 flex-col items-center px-0.5 py-1">
+        <span className="text-[28px] font-black italic leading-none tracking-tighter text-emerald-400">-{mark.pct}%</span>
+        <span className="mt-1 max-w-full truncate text-[7px] font-black uppercase tracking-[0.12em] text-emerald-300/80">ფასდაკლება</span>
+      </div>
+    )
+  }
+
+  if (mark?.kind === 'gift') {
+    return (
+      <div className="relative z-10 flex w-full min-w-0 flex-col items-center gap-1 px-0.5 py-1">
+        <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-amber-300/30 bg-amber-400/10 px-2 py-1 text-[8px] font-black leading-none tracking-[0.06em] text-amber-200">
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+            <rect x="3" y="10" width="18" height="10" rx="1.5" />
+            <path d="M3 14.5h18M12 10v10" />
+            <path d="M12 10c-2 0-4.2-1-4.2-3.1C7.8 5.2 9.4 4.4 12 6.6 14.6 4.4 16.2 5.2 16.2 6.9 16.2 9 14 10 12 10z" />
+          </svg>
+          <span className="truncate">საჩუქარი</span>
+        </span>
+        <span className="line-clamp-2 max-w-full break-words text-center text-[8px] font-bold normal-case not-italic leading-tight text-amber-100/70">
+          {mark.text}
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <h2 className="text-4xl text-center py-2 text-emerald-500 text-glow leading-none relative z-10 tracking-tighter uppercase font-black italic">
+      {deal.offer}
+    </h2>
+  )
+}
+
 function GridDealCard({ deal, onDealClick }: { deal: any; onDealClick?: (deal: any) => void }) {
   const stopCardFlip = (e: React.SyntheticEvent) => {
     e.stopPropagation()
@@ -38,9 +91,7 @@ function GridDealCard({ deal, onDealClick }: { deal: any; onDealClick?: (deal: a
             </h3>
         </div>
         
-        <h2 className="text-4xl text-center py-2 text-emerald-500 text-glow leading-none relative z-10 tracking-tighter uppercase font-black italic">
-          {deal.offer}
-        </h2>
+        <DealValueMark deal={deal} />
         
         <div className="flex items-center justify-end relative z-10">
           <span className="text-[7px] text-emerald-500/70 group-hover/deal:text-emerald-400 tracking-[0.28em] uppercase font-black italic transition-colors">

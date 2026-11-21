@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const PROFILE_FIELDS = 'id, full_name, username, avatar_url, bio, token_limit, token_claims'
-const DEAL_FIELDS = 'id, brand_id, title, description, image_url, logo, price, original_price, intel, stock_limit, stock_sold, is_active'
+const DEAL_FIELDS = 'id, brand_id, title, description, image_url, logo, price, original_price, gift_description, intel, stock_limit, stock_sold, is_active'
 
 function adminClient() {
   return createClient(
@@ -55,6 +55,7 @@ function publicDeal(row: any) {
     logo: deal.logo ?? null,
     price: deal.price ?? null,
     original_price: deal.original_price ?? null,
+    gift_description: deal.gift_description ?? null,
     intel: deal.intel ?? null,
     stock_limit: deal.stock_limit ?? null,
     stock_sold: deal.stock_sold ?? null,

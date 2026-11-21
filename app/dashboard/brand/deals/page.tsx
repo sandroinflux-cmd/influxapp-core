@@ -13,6 +13,7 @@ const CATEGORIES = [
 ] as const
 
 type DealCategory = (typeof CATEGORIES)[number]['value']
+type DealMode = 'discount' | 'gift'
 
 function asCategory(value: unknown): DealCategory {
   return CATEGORIES.some((item) => item.value === value) ? value as DealCategory : 'other'
@@ -33,6 +34,8 @@ export default function BrandDealsPage() {
   const [freeDelivery, setFreeDelivery] = useState(false)
   const [deliveryEstimate, setDeliveryEstimate] = useState('')
   const [isActive, setIsActive] = useState(true)
+  const [dealMode, setDealMode] = useState<DealMode>('discount')
+  const [showExtras, setShowExtras] = useState(false)
   const [newShare, setNewShare] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -81,6 +84,8 @@ export default function BrandDealsPage() {
     setFreeDelivery(false)
     setDeliveryEstimate('')
     setIsActive(true)
+    setDealMode('discount')
+    setShowExtras(false)
     setNewShare('')
     setEditingId(null)
   }
@@ -105,6 +110,8 @@ export default function BrandDealsPage() {
     setFreeDelivery(Boolean(deal.free_delivery_tbilisi))
     setDeliveryEstimate(deal.delivery_estimate || '')
     setIsActive(deal.is_active !== false)
+    setDealMode(String(deal.gift_description || '').trim() ? 'gift' : 'discount')
+    setShowExtras(false)
     setNewShare(String(deal.totalShare ?? ''))
     setIsCreating(true)
   }
@@ -133,11 +140,26 @@ export default function BrandDealsPage() {
   const dealFields = () => {
     const parsedPrice = Number(price)
     const parsedShare = Number(newShare)
-    if (!title.trim()) return { error: 'Deal title is required.', fields: null }
-    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) return { error: 'Price is required in GEL.', fields: null }
-    if (!Number.isFinite(parsedShare)) return { error: 'Share is required.', fields: null }
-    const parsedOriginal = originalPrice.trim() === '' ? null : Number(originalPrice)
-    if (parsedOriginal !== null && !Number.isFinite(parsedOriginal)) return { error: 'Original price must be a number.', fields: null }
+    if (!title.trim()) return { error: 'შეთავაზების დასახელება აუცილებელია.', fields: null }
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) return { error: 'ფასი აუცილებელია და 0-ზე მეტი უნდა იყოს.', fields: null }
+    if (newShare.trim() === '' || !Number.isFinite(parsedShare)) return { error: 'ინფლუენსერის საკომისიო აუცილებელია.', fields: null }
+
+    let original_price: number | null = null
+    let gift_description: string | null = null
+    if (dealMode === 'discount') {
+      if (originalPrice.trim() === '') return { error: 'ძველი ფასი აუცილებელია.', fields: null }
+      const parsedOriginal = Number(originalPrice)
+      if (!Number.isFinite(parsedOriginal)) return { error: 'ძველი ფასი რიცხვი უნდა იყოს.', fields: null }
+      if (!(parsedOriginal > parsedPrice)) return { error: 'ძველი ფასი ახალ ფასზე მეტი უნდა იყოს.', fields: null }
+      original_price = Number(parsedOriginal.toFixed(2))
+      gift_description = null
+    } else {
+      const gift = giftDescription.trim()
+      if (!gift) return { error: 'საჩუქრის აღწერა აუცილებელია.', fields: null }
+      gift_description = gift
+      original_price = null
+    }
+
     const parsedStock = Math.max(0, Math.floor(Number(stockLimit) || 0))
     const picture = imageUrl.trim() || null
 
@@ -146,20 +168,29 @@ export default function BrandDealsPage() {
       fields: {
         title: title.trim(),
         price: Number(parsedPrice.toFixed(2)),
-        original_price: parsedOriginal === null ? null : Number(parsedOriginal.toFixed(2)),
+        original_price,
         description: description.trim() || null,
         image_url: picture,
         logo: picture || brandProfile?.avatar_url || '💠',
-        category,
+        category: category || 'other',
         stock_limit: parsedStock,
-        gift_description: giftDescription.trim() || null,
+        gift_description,
         free_delivery_tbilisi: freeDelivery,
         delivery_estimate: deliveryEstimate.trim() || null,
-        is_active: isActive ? true : false,
+        is_active: editingId ? isActive !== false : true,
         totalShare: Math.round(parsedShare),
       },
     }
   }
+
+  const discountPreview = (() => {
+    if (dealMode !== 'discount') return null
+    const next = Number(price)
+    const prev = Number(originalPrice)
+    if (!Number.isFinite(next) || !Number.isFinite(prev) || !(prev > next) || next <= 0) return null
+    const pct = Math.round(((prev - next) / prev) * 100)
+    return pct > 0 ? pct : null
+  })()
 
   const handleCreate = async () => {
     const payload = dealFields()
@@ -239,37 +270,79 @@ export default function BrandDealsPage() {
               <button onClick={() => { setIsCreating(false); resetForm() }} className="absolute top-6 right-6 h-8 w-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-500 hover:text-white transition-all italic font-black">X</button>
               <div className="flex flex-col gap-3 max-h-[78vh] overflow-y-auto pr-1">
                 <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.4em] italic text-center">{editingId ? 'Edit Deal' : 'New Deal'}</p>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} type="text" placeholder="Deal / bundle title" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
-                <div className="grid grid-cols-2 gap-3">
-                  <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" min="0" step="0.01" placeholder="Price GEL *" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
-                  <input value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)} type="number" min="0" step="0.01" placeholder="Original price" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
-                </div>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" rows={3} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold resize-none" />
-                <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} type="url" placeholder="Image URL" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-[11px] text-white focus:border-blue-500 outline-none font-bold" />
-                <label className="block w-full cursor-pointer bg-white/5 border border-dashed border-white/15 rounded-2xl py-3 text-center text-[9px] font-black uppercase tracking-[0.3em] text-gray-400 hover:text-white hover:border-blue-500/40 transition-all italic">
-                  {uploadingImage ? 'Uploading...' : imageUrl ? 'Replace Image' : 'Upload Image'}
-                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploadingImage} />
-                </label>
-                {imageUrl.startsWith('http') && (
-                  <img src={imageUrl} alt="" className="mx-auto h-16 w-16 rounded-2xl object-cover border border-white/10" />
-                )}
-                <select value={category} onChange={(e) => setCategory(asCategory(e.target.value))} className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold">
-                  {CATEGORIES.map((item) => (
-                    <option key={item.value} value={item.value} className="bg-black">{item.label}</option>
+                <div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-black/40 p-1">
+                  {([
+                    ['discount', 'ფასდაკლება'],
+                    ['gift', 'საჩუქარი'],
+                  ] as const).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setDealMode(mode)}
+                      className={`rounded-xl py-3 text-[11px] font-black tracking-[0.08em] transition-all ${dealMode === mode ? 'bg-white text-black' : 'text-white/40 hover:text-white'}`}
+                    >
+                      {label}
+                    </button>
                   ))}
-                </select>
-                <input value={stockLimit} onChange={(e) => setStockLimit(e.target.value)} type="number" min="0" step="1" placeholder="Stock limit (0 = unlimited)" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
-                <input value={giftDescription} onChange={(e) => setGiftDescription(e.target.value)} type="text" placeholder="Gift description" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-amber-300/50 outline-none font-bold" />
-                <input value={deliveryEstimate} onChange={(e) => setDeliveryEstimate(e.target.value)} type="text" placeholder="Delivery estimate" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
-                <input value={newShare} onChange={(e) => setNewShare(e.target.value)} type="number" placeholder="Total share %" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
-                <label className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-white/80">
-                  Free delivery in Tbilisi
-                  <input type="checkbox" checked={freeDelivery} onChange={(e) => setFreeDelivery(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                </div>
+                <label className="block">
+                  <span className="mb-1.5 block px-1 text-[8px] font-black uppercase tracking-[0.22em] text-gray-500 italic">შეთავაზების დასახელება</span>
+                  <input value={title} onChange={(e) => setTitle(e.target.value)} type="text" placeholder="შეთავაზების დასახელება" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
                 </label>
-                <label className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[11px] font-black uppercase tracking-widest text-white/80">
-                  Active
-                  <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+                {dealMode === 'discount' ? (
+                  <>
+                    <label className="block">
+                      <span className="mb-1.5 block px-1 text-[8px] font-black uppercase tracking-[0.22em] text-gray-500 italic">ძველი ფასი (GEL)</span>
+                      <input value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)} type="number" min="0" step="0.01" inputMode="decimal" placeholder="0.00" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1.5 block px-1 text-[8px] font-black uppercase tracking-[0.22em] text-gray-500 italic">ახალი ფასი (GEL)</span>
+                      <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" min="0" step="0.01" inputMode="decimal" placeholder="0.00" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
+                    </label>
+                    {discountPreview !== null && (
+                      <div className="flex justify-center">
+                        <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[10px] font-black tracking-wide text-emerald-300">
+                          მომხმარებლის ფასდაკლება: -{discountPreview}%
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <label className="block">
+                      <span className="mb-1.5 block px-1 text-[8px] font-black uppercase tracking-[0.22em] text-gray-500 italic">ფასი (GEL)</span>
+                      <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" min="0" step="0.01" inputMode="decimal" placeholder="0.00" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1.5 block px-1 text-[8px] font-black uppercase tracking-[0.22em] text-gray-500 italic">საჩუქრის აღწერა</span>
+                      <input value={giftDescription} onChange={(e) => setGiftDescription(e.target.value)} type="text" placeholder="მაგ: უფასო მისტერი ბოქსი / საჩუქრად ტუჩსაცხი" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-amber-300/50 outline-none font-bold" />
+                    </label>
+                  </>
+                )}
+                <label className="block">
+                  <span className="mb-1.5 block px-1 text-[8px] font-black uppercase tracking-[0.22em] text-gray-500 italic">ინფლუენსერის საკომისიო (%)</span>
+                  <input value={newShare} onChange={(e) => setNewShare(e.target.value)} type="number" inputMode="decimal" placeholder="მაგ: 15" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
                 </label>
+                <button
+                  type="button"
+                  onClick={() => setShowExtras((open) => !open)}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left text-[10px] font-black tracking-[0.06em] text-white/55 hover:text-white hover:border-white/20 transition-all"
+                >
+                  {showExtras ? '−' : '+'} ფოტო და მარაგის ლიმიტი (არასავალდებულო)
+                </button>
+                {showExtras && (
+                  <div className="flex flex-col gap-3">
+                    <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} type="url" placeholder="Image URL" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-[11px] text-white focus:border-blue-500 outline-none font-bold" />
+                    <label className="block w-full cursor-pointer bg-white/5 border border-dashed border-white/15 rounded-2xl py-3 text-center text-[9px] font-black uppercase tracking-[0.3em] text-gray-400 hover:text-white hover:border-blue-500/40 transition-all italic">
+                      {uploadingImage ? 'Uploading...' : imageUrl ? 'Replace Image' : 'Upload Image'}
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploadingImage} />
+                    </label>
+                    {imageUrl.startsWith('http') && (
+                      <img src={imageUrl} alt="" className="mx-auto h-16 w-16 rounded-2xl object-cover border border-white/10" />
+                    )}
+                    <input value={stockLimit} onChange={(e) => setStockLimit(e.target.value)} type="number" min="0" step="1" placeholder="Stock limit (0 = unlimited)" className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none font-bold" />
+                  </div>
+                )}
                 <button onClick={handleCreate} disabled={uploadingImage} className="bg-white text-black w-full py-5 rounded-2xl font-black text-[11px] uppercase tracking-[0.4em] hover:bg-blue-600 hover:text-white transition-all italic shadow-xl active:scale-95 disabled:opacity-40">{editingId ? 'SAVE' : 'CREATE'}</button>
               </div>
             </div>

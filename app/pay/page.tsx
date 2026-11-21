@@ -80,6 +80,45 @@ function dealSoldOut(deal: DealRow) {
   return deal.is_active === false || (limit > 0 && sold >= limit)
 }
 
+function GiftBoxIcon() {
+  return (
+    <svg viewBox="0 0 48 48" aria-hidden="true" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round">
+      <rect x="6" y="20" width="36" height="22" rx="3" />
+      <path d="M6 28h36" />
+      <path d="M24 20v22" />
+      <path d="M24 20c-4.2 0-9-2.1-9-6.6 0-3.4 3.2-5 9 0 5.8-5 9-3.4 9 0 0 4.5-4.8 6.6-9 6.6z" />
+    </svg>
+  )
+}
+
+function AppleMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 fill-current">
+      <path d="M16.37 12.62c.03 2.22 1.95 2.96 1.97 2.97-.02.06-.31 1.05-1.01 2.08-.61.89-1.24 1.77-2.23 1.79-.95.02-1.26-.56-2.35-.56s-1.43.54-2.33.58c-.94.04-1.66-.96-2.27-1.84-1.24-1.8-2.19-5.09-.91-7.31.63-1.1 1.77-1.8 3-1.82.94-.02 1.82.63 2.4.63.57 0 1.64-.78 2.77-.66.47.02 1.8.19 2.65 1.45-.07.04-1.58.92-1.56 2.69zM14.7 6.18c.5-.6.83-1.44.74-2.28-.71.03-1.58.48-2.09 1.08-.46.53-.86 1.38-.75 2.2.8.06 1.61-.4 2.1-1z" />
+    </svg>
+  )
+}
+
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5">
+      <path fill="#4285F4" d="M23.52 12.27c0-.82-.07-1.6-.21-2.36H12v4.46h6.46a5.53 5.53 0 0 1-2.4 3.63v3.01h3.88c2.27-2.09 3.58-5.17 3.58-8.74z" />
+      <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-3.01c-1.07.72-2.45 1.15-4.06 1.15-3.13 0-5.78-2.11-6.73-4.95H1.26v3.11C3.23 21.3 7.31 24 12 24z" />
+      <path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 0 1 4.89 12c0-.79.14-1.56.38-2.28V6.61H1.26A12 12 0 0 0 0 12c0 1.94.46 3.77 1.26 5.39l4.01-3.11z" />
+      <path fill="#EA4335" d="M12 4.77c1.76 0 3.35.61 4.6 1.8l3.45-3.45C17.95 1.19 15.24 0 12 0 7.31 0 3.23 2.7 1.26 6.61l4.01 3.11C6.22 6.88 8.87 4.77 12 4.77z" />
+    </svg>
+  )
+}
+
+function CardMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <rect x="2.5" y="5" width="19" height="14" rx="2" />
+      <path d="M2.5 10h19" />
+    </svg>
+  )
+}
+
 function CheckoutContent() {
   const searchParams = useSearchParams()
   const dealId = searchParams.get('deal')
@@ -395,11 +434,20 @@ function CheckoutContent() {
           </div>
         </div>
 
-        {(gift || (stockLimit > 0 && !soldOut) || deliveryLine) && (
-          <div className="mt-4 space-y-2 text-center">
-            {gift && (
-              <p className="text-[11px] font-bold italic leading-snug text-amber-200/80">🎁 {gift}</p>
-            )}
+        {gift && (
+          <div className="mt-4 flex items-center gap-3 rounded-[22px] border border-amber-200/15 bg-amber-300/[0.045] px-3 py-3">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-200/25 bg-amber-300/10 text-amber-100 shadow-[0_0_24px_rgba(251,191,36,0.12)]">
+              <GiftBoxIcon />
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-[8px] font-black uppercase tracking-[0.28em] text-amber-200/50">საჩუქარი</p>
+              <p className="mt-1 break-words text-[13px] font-bold leading-snug text-amber-50/90">{gift}</p>
+            </div>
+          </div>
+        )}
+
+        {((stockLimit > 0 && !soldOut) || deliveryLine) && (
+          <div className="mt-3 space-y-2 text-center">
             {stockLimit > 0 && !soldOut && (
               <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/35">დარჩა {remaining}</p>
             )}
@@ -454,6 +502,26 @@ function CheckoutContent() {
         >
           {soldOut ? 'ამოიწურა' : submitting ? 'ბანკზე გადასვლა...' : `გადახდა ${price.toFixed(2)} GEL`}
         </button>
+        {!soldOut && (
+          <div className="mt-3 flex w-full min-w-0 flex-col items-center gap-2">
+            <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5">
+              <span className="inline-flex h-7 items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] px-2.5 text-white">
+                <AppleMark />
+                <span className="text-[11px] font-semibold tracking-tight">Pay</span>
+              </span>
+              <span className="inline-flex h-7 items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] px-2.5 text-white">
+                <GoogleMark />
+                <span className="text-[11px] font-medium tracking-tight text-white/90">Pay</span>
+              </span>
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/55" aria-hidden="true">
+                <CardMark />
+              </span>
+            </div>
+            <p className="max-w-full break-words px-1 text-center text-[10px] font-medium leading-snug text-white/55">
+              შემდეგ გვერდზე შეგიძლია გადაიხადო Apple Pay, Google Pay ან ბარათით
+            </p>
+          </div>
+        )}
         <p className="mt-3 text-center text-[8px] font-black tracking-[0.4em] text-blue-500 uppercase italic">Bank of Georgia</p>
       </motion.form>
       </div>
