@@ -12,7 +12,7 @@ const termsData = [
         <p><strong className="text-white">შპს „ინფლუ იქსი 2025“ (INFLUX)</strong></p>
         <p>ს/ნ: 406517675</p>
         <p>მისამართი: ქ. თბილისი, აწყურის ქ. N18</p>
-        <p>ტელეფონის ნომერი: 500 05 06 08</p>
+        <p>ტელეფონის ნომერი: <a href="https://wa.me/995500050607" target="_blank" rel="noopener noreferrer" className="text-emerald-500">500 05 06 07</a></p>
         <p>ელ. ფოსტა: <span className="text-emerald-500">sandro@influxapp.io</span></p>
       </div>
     )

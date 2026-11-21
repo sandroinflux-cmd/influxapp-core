@@ -69,24 +69,30 @@ export default function NeuralInterface() {
       
       {/* 🛰️ Nav */}
       <nav className="fixed top-0 left-0 right-0 z-[100] h-24 flex items-center justify-between px-6 md:px-10 bg-transparent">
-        <h1 
-          className="text-2xl tracking-tighter cursor-pointer hover:text-emerald-500 transition-colors" 
+        <button
+          type="button"
+          aria-label="InfluX"
+          className="cursor-pointer border-0 bg-transparent p-0"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         >
-          INFLUX
-        </h1>
+          <img
+            src="/influx-logo.png"
+            alt="InfluX"
+            className="h-6 w-auto object-contain sm:h-7"
+          />
+        </button>
         <LanguageCube lang={lang} setLang={setLang} />
       </nav>
 
       {/* 🌪️ HERO SECTION */}
       <section className="h-screen flex flex-col items-center justify-center p-6 text-center relative">
-        <motion.div 
-          animate={{ color: ["#ffffff", "#10b981", "#3b82f6", "#ffffff"] }}
-          transition={{ duration: 10, repeat: Infinity }}
-          className="z-10"
-        >
-          <h2 className="text-[17vw] md:text-[14vw] leading-none tracking-tighter cursor-default select-none font-[1000]">INFLUX</h2>
-        </motion.div>
+        <div className="z-10 w-full px-2">
+          <img
+            src="/influx-logo.png"
+            alt="InfluX"
+            className="mx-auto h-14 w-auto max-w-full object-contain sm:h-20 md:h-28 lg:h-36"
+          />
+        </div>
         
         <div className="mt-8 relative group p-1 overflow-hidden rounded-full">
           <motion.div className="absolute inset-0 rounded-full z-0" style={{ background: "conic-gradient(from 0deg, #10b981, transparent 40%)" }} animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }} />
@@ -154,7 +160,7 @@ export default function NeuralInterface() {
           {/* WhatsApp Button */}
           <div className="flex flex-col items-center gap-4">
             <button 
-              onClick={() => handleContactClick('whatsapp', 'https://wa.me/995500050608')}
+              onClick={() => handleContactClick('whatsapp', 'https://wa.me/995500050607')}
               className={`group w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center transition-all duration-500 shadow-xl ${revealedChannel === 'whatsapp' ? 'bg-emerald-500 scale-110' : 'bg-white hover:bg-emerald-500'}`}
             >
               <svg className={`w-8 h-8 md:w-10 md:h-10 transition-transform ${revealedChannel === 'whatsapp' ? 'text-white' : 'text-black group-hover:rotate-12'}`} viewBox="0 0 24 24" fill="currentColor">
@@ -187,7 +193,15 @@ export default function NeuralInterface() {
                 exit={{ opacity: 0, y: -10 }}
                 className="text-lg md:text-2xl font-black italic tracking-tighter text-white"
               >
-                {revealedChannel === 'whatsapp' ? '500 05 06 08' : 'sandro@influxapp.io'}
+                {revealedChannel === 'whatsapp' ? (
+                  <a
+                    href="https://wa.me/995500050607"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    500 05 06 07
+                  </a>
+                ) : 'sandro@influxapp.io'}
               </motion.p>
             ) : (
               <motion.p 

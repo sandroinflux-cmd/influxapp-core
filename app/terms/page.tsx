@@ -25,7 +25,7 @@ const termsData = [
   {
     id: '03',
     title: 'საკონტაქტო ინფორმაცია',
-    content: <p>ნებისმიერი იურიდიული, ტექნიკური თუ ფინანსური საკითხის დასაზუსტებლად დაგვიკავშირდით ელ. ფოსტაზე: <strong className="text-emerald-500">sandro@influxapp.io</strong> ან ტელეფონის ნომერზე <strong className="text-emerald-500">500 05 06 08</strong>.</p>
+    content: <p>ნებისმიერი იურიდიული, ტექნიკური თუ ფინანსური საკითხის დასაზუსტებლად დაგვიკავშირდით ელ. ფოსტაზე: <strong className="text-emerald-500">sandro@influxapp.io</strong> ან ტელეფონის ნომერზე <a href="https://wa.me/995500050607" target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-500">500 05 06 07</a>.</p>
   },
   {
     id: '04',

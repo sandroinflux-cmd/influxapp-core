@@ -26,7 +26,7 @@ function formatGel(value: number) {
 
 function whatsappHref(orderId: string) {
   const text = `გამარჯობა, შეკვეთა #${shortOrderId(orderId)}`
-  return `https://wa.me/995500050608?text=${encodeURIComponent(text)}`
+  return `https://wa.me/995500050607?text=${encodeURIComponent(text)}`
 }
 
 function Shell({ children }: { children: ReactNode }) {
