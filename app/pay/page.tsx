@@ -306,12 +306,20 @@ function CheckoutContent() {
   return (
     <main className="min-h-screen bg-[#010201] text-white flex flex-col items-center justify-center p-4 font-sans relative">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98105,transparent_70%)] pointer-events-none" />
+      <div className="relative z-10 flex w-full max-w-[400px] flex-col items-center">
+        <div className="mb-5 flex w-full items-center justify-center">
+          <img
+            src="/influx-logo.png"
+            alt="InfluX"
+            className="h-5 w-auto max-w-full object-contain sm:h-6"
+          />
+        </div>
       <motion.form
         onSubmit={pay}
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.35 }}
-        className="relative z-10 w-full max-w-[400px] bg-[#050505] border border-blue-500/30 rounded-[35px] p-6 sm:p-8 shadow-[0_0_80px_rgba(37,99,235,0.2)]"
+        className="w-full bg-[#050505] border border-blue-500/30 rounded-[35px] p-6 sm:p-8 shadow-[0_0_80px_rgba(37,99,235,0.2)]"
       >
         <div className="flex flex-col items-center mb-6 border-b border-white/5 pb-6">
           <div className="flex items-center justify-center gap-3 mb-3">
@@ -448,6 +456,7 @@ function CheckoutContent() {
         </button>
         <p className="mt-3 text-center text-[8px] font-black tracking-[0.4em] text-blue-500 uppercase italic">Bank of Georgia</p>
       </motion.form>
+      </div>
     </main>
   )
 }

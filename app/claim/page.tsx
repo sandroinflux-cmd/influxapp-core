@@ -97,6 +97,11 @@ function ClaimContent() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#10b98108,transparent_70%)] pointer-events-none" />
 
       <div className="z-10 flex flex-col items-center w-full max-w-[340px]">
+        <img
+          src="/influx-logo.png"
+          alt="InfluX"
+          className="mb-4 h-6 w-auto max-w-full object-contain"
+        />
         {!profile?.id ? (
           <p className="text-center text-[11px] font-black uppercase tracking-[0.28em] text-white/50 italic">
             ბმული არასწორია

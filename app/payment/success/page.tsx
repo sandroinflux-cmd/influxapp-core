@@ -32,7 +32,14 @@ function whatsappHref(orderId: string) {
 function Shell({ children }: { children: ReactNode }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#010201] px-5 py-10 text-white">
-      <div className="w-full max-w-md">{children}</div>
+      <div className="flex w-full max-w-md flex-col items-center">
+        <img
+          src="/influx-logo.png"
+          alt="InfluX"
+          className="mb-6 h-5 w-auto max-w-full object-contain sm:h-6"
+        />
+        <div className="w-full">{children}</div>
+      </div>
     </main>
   )
 }
