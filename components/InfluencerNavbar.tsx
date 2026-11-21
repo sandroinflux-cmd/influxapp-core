@@ -35,10 +35,10 @@ export default function InfluencerNavbar() {
       {/* 🚀 100% გამჭვირვალე ფონი (bg-transparent) */}
       <div className="w-full max-w-7xl bg-transparent border border-emerald-500/20 rounded-[30px] px-8 py-3 flex justify-between items-center pointer-events-auto">
         
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push('/dashboard/influencer')}>
-          <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]" />
-          <span className="text-[11px] font-black tracking-[0.4em] uppercase italic text-white">
-            Influx <span className="text-emerald-500">Node</span>
+        <div className="flex items-center gap-2.5 cursor-pointer min-w-0" onClick={() => router.push('/dashboard/influencer')}>
+          <img src="/influx-logo.png" alt="INFLUX" className="h-6 sm:h-7 w-auto object-contain shrink-0" />
+          <span className="text-[11px] font-black tracking-[0.3em] uppercase italic text-emerald-500 shrink-0">
+            Node
           </span>
         </div>
 

@@ -69,24 +69,22 @@ export default function NeuralInterface() {
       
       {/* 🛰️ Nav */}
       <nav className="fixed top-0 left-0 right-0 z-[100] h-24 flex items-center justify-between px-6 md:px-10 bg-transparent">
-        <h1 
-          className="text-2xl tracking-tighter cursor-pointer hover:text-emerald-500 transition-colors" 
+        <img
+          src="/influx-logo.png"
+          alt="INFLUX"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        >
-          INFLUX
-        </h1>
+          className="h-8 md:h-9 w-auto object-contain cursor-pointer"
+        />
         <LanguageCube lang={lang} setLang={setLang} />
       </nav>
 
       {/* 🌪️ HERO SECTION */}
       <section className="h-screen flex flex-col items-center justify-center p-6 text-center relative">
-        <motion.div 
-          animate={{ color: ["#ffffff", "#10b981", "#3b82f6", "#ffffff"] }}
-          transition={{ duration: 10, repeat: Infinity }}
-          className="z-10"
-        >
-          <h2 className="text-[17vw] md:text-[14vw] leading-none tracking-tighter cursor-default select-none font-[1000]">INFLUX</h2>
-        </motion.div>
+        <img
+          src="/influx-logo.png"
+          alt="INFLUX"
+          className="z-10 h-auto w-[min(92vw,1040px)] object-contain select-none md:w-[min(68vw,1040px)]"
+        />
         
         <div className="mt-8 relative group p-1 overflow-hidden rounded-full">
           <motion.div className="absolute inset-0 rounded-full z-0" style={{ background: "conic-gradient(from 0deg, #10b981, transparent 40%)" }} animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }} />

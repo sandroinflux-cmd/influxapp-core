@@ -23,6 +23,7 @@ export default function Footer() {
       </div>
 
       <div className="text-center space-y-6">
+        <img src="/influx-logo.png" alt="INFLUX" className="mx-auto h-8 w-auto object-contain" />
         <div className="flex flex-col items-center gap-2">
           <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.5em] italic">
             © 2026 INFLUX • SECURED ECOSYSTEM

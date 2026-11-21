@@ -98,8 +98,9 @@ export default async function AdminDashboard(props: any) {
         {/* 🛸 ჰედერი */}
         <header className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center mt-4">
           <div>
-            <h1 className="text-3xl font-black italic tracking-tighter uppercase text-emerald-500 drop-shadow-[0_0_15px_rgba(16,185,129,0.4)]">
-              InfluX <span className="text-white">Command Center</span>
+            <h1 className="flex flex-wrap items-center gap-x-3 gap-y-2 text-3xl font-black italic tracking-tighter uppercase text-white">
+              <img src="/influx-logo.png" alt="INFLUX" className="h-8 w-auto object-contain" />
+              <span>Command Center</span>
             </h1>
             <p className="text-[10px] text-gray-500 tracking-[0.3em] uppercase mt-2 font-bold">
               Core Data Systems Active
