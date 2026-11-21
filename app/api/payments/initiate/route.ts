@@ -208,7 +208,8 @@ export async function POST(request: Request) {
       .insert([{
         bill_amount: Number(billAmount.toFixed(2)),
         final_amount: Number(finalAmount.toFixed(2)),
-        amount: Number(billAmount.toFixed(2)),
+        // Payable price. A transactions trigger copies `amount` onto final_amount and rebuilds the split from it.
+        amount: Number(finalAmount.toFixed(2)),
         brand_id: deal.brand_id,
         influencer_id: partnership.influencer_id,
         deal_id: deal.id,
@@ -251,15 +252,30 @@ export async function POST(request: Request) {
       failParams.toString()
     )
 
-    const bogOrderId = bogOrder?.id || bogOrder?.order_id
-    if (!bogOrderId) throw new Error('BOG order id missing')
+    const bogOrderId = readText(bogOrder?.id) || readText(bogOrder?.order_id) || readText(bogOrder?.body?.id)
+    if (!bogOrderId) {
+      console.error('BOG order id missing', {
+        txId: tx.id,
+        keys: bogOrder && typeof bogOrder === 'object' ? Object.keys(bogOrder) : [],
+      })
+      throw new Error('BOG order id missing')
+    }
 
-    const { error: bogIdError } = await supabase
+    const { data: saved, error: bogIdError } = await supabase
       .from('transactions')
       .update({ bog_order_id: bogOrderId })
       .eq('id', tx.id)
+      .select('id, bog_order_id')
+      .maybeSingle()
 
-    if (bogIdError) throw bogIdError
+    if (bogIdError || saved?.bog_order_id !== bogOrderId) {
+      console.error('Failed to save bog_order_id', {
+        txId: tx.id,
+        bogOrderId,
+        message: bogIdError?.message || 'transactions row was not updated',
+      })
+      throw bogIdError || new Error('Failed to save bog_order_id')
+    }
 
     const checkoutUrl = bogOrder?._links?.redirect?.href
     if (!checkoutUrl) throw new Error('BOG checkout URL missing')

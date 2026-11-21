@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { bogStatusKey, fetchBogOrder } from '@/lib/bog'
+import { bogStatusKey, fetchBogOrder, unwrapBogOrder } from '@/lib/bog'
 
-const APPROVED = new Set(['completed', 'approved', 'success'])
+const APPROVED = new Set(['completed', 'approved', 'success', 'paid'])
 const REJECTED = new Set(['rejected', 'failed', 'error', 'cancelled', 'canceled'])
 const AMOUNT_TOLERANCE_GEL = 0.02
 
@@ -32,6 +32,7 @@ type TransactionRow = {
 }
 
 function asText(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
   return typeof value === 'string' && value.trim() ? value.trim() : ''
 }
 
@@ -41,17 +42,39 @@ function shortOrderId(id: string) {
 
 function readAmount(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value)
+  if (typeof value === 'string') {
+    const normalized = value.trim().replace(/\s/g, '').replace(',', '.')
+    if (!normalized) return null
+    const numeric = normalized.replace(/[^\d.-]/g, '')
+    if (!/\d/.test(numeric)) return null
+    const parsed = Number(numeric)
     return Number.isFinite(parsed) ? parsed : null
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>
+    for (const key of ['value', 'amount', 'total', 'total_amount', 'transfer_amount', 'request_amount']) {
+      if (!(key in record)) continue
+      const nested = readAmount(record[key])
+      if (nested !== null) return nested
+    }
   }
   return null
 }
 
-/** Paid amount from the BOG order payload, when the bank includes one. */
-function bogPaidAmount(order: any): number | null {
-  const purchase = order?.purchase_units
-  const payment = order?.payment_detail
+function purchaseUnits(order: any) {
+  const units = order?.purchase_units ?? order?.purchaseUnits
+  if (Array.isArray(units)) return units[0] ?? null
+  return units ?? null
+}
+
+/**
+ * Paid amount from the BOG order payload.
+ * A zero `transfer_amount` (refund placeholder) must not hide a matching `request_amount`.
+ */
+function bogPaidAmount(order: any, expectedAmount: number): number | null {
+  const source = unwrapBogOrder(order)
+  const purchase = purchaseUnits(source)
+  const payment = source?.payment_detail
   const candidates = [
     purchase?.transfer_amount,
     purchase?.request_amount,
@@ -59,16 +82,36 @@ function bogPaidAmount(order: any): number | null {
     purchase?.paid_amount,
     payment?.transfer_amount,
     payment?.amount,
-    order?.transfer_amount,
-    order?.paid_amount,
-    order?.amount,
-    order?.total_amount,
+    source?.transfer_amount,
+    source?.paid_amount,
+    source?.amount,
+    source?.total_amount,
   ]
-  for (const candidate of candidates) {
-    const amount = readAmount(candidate)
-    if (amount !== null) return amount
-  }
-  return null
+  const amounts = candidates
+    .map((candidate) => readAmount(candidate))
+    .filter((amount): amount is number => amount !== null)
+
+  if (amounts.length === 0) return null
+  const close = amounts.find((amount) => Math.abs(amount - expectedAmount) <= AMOUNT_TOLERANCE_GEL)
+  if (close !== undefined) return close
+  const positive = amounts.find((amount) => amount > 0)
+  return positive !== undefined ? positive : amounts[0]
+}
+
+function bogExternalOrderId(order: any) {
+  const source = unwrapBogOrder(order)
+  return asText(source?.external_order_id) || asText(source?.shop_order_id)
+}
+
+/** Equal, or a BOG-truncated prefix (statement text keeps the first 25 characters). */
+function sameExternalOrder(externalId: string, txId: string) {
+  const left = externalId.trim().toLowerCase()
+  const right = txId.trim().toLowerCase()
+  if (!left || !right) return true
+  if (left === right) return true
+  const shorter = left.length <= right.length ? left : right
+  const longer = left.length <= right.length ? right : left
+  return shorter.length >= 8 && longer.startsWith(shorter)
 }
 
 function stockWasRejected(result: unknown): boolean {
@@ -104,20 +147,49 @@ async function notifyAdmin(message: string) {
   }
 }
 
+function logSkip(
+  tx: TransactionRow,
+  reason: BogVerifyOutcome,
+  statusKey: string,
+  paidAmount: number | null,
+  externalOrderId?: string
+) {
+  const payload = {
+    txId: tx.id,
+    bogOrderId: tx.bog_order_id ?? null,
+    statusKey: statusKey || null,
+    paidAmount,
+    expectedAmount: Number(tx.final_amount || 0),
+    externalOrderId: externalOrderId || null,
+    reason,
+  }
+  if (reason === 'amount_mismatch' || reason === 'order_mismatch' || reason === 'missing_order') {
+    console.error('[BOG verify] skipped approval', payload)
+    return
+  }
+  console.warn('[BOG verify] skipped approval', payload)
+}
+
 export async function verifyBogTransaction(
   supabase: SupabaseClient,
   tx: TransactionRow
 ): Promise<{ outcome: BogVerifyOutcome }> {
   if (tx.status === 'approved') return { outcome: 'already_approved' }
-  if (!tx.bog_order_id) return { outcome: 'missing_order' }
-
-  const verified = await fetchBogOrder(String(tx.bog_order_id))
-  const verifiedExternal = asText(verified?.external_order_id)
-  if (verifiedExternal && verifiedExternal !== tx.id) {
-    return { outcome: 'order_mismatch' }
+  if (!tx.bog_order_id) {
+    logSkip(tx, 'missing_order', '', null)
+    return { outcome: 'missing_order' }
   }
 
+  const verified = await fetchBogOrder(String(tx.bog_order_id))
+  const verifiedExternal = bogExternalOrderId(verified)
   const statusKey = bogStatusKey(verified)
+  const expectedAmount = Number(tx.final_amount || 0)
+  const paidAmount = bogPaidAmount(verified, expectedAmount)
+
+  if (verifiedExternal && !sameExternalOrder(verifiedExternal, tx.id)) {
+    logSkip(tx, 'order_mismatch', statusKey, paidAmount, verifiedExternal)
+    return { outcome: 'order_mismatch' }
+  }
 
   if (REJECTED.has(statusKey)) {
     const { error } = await supabase
@@ -126,19 +198,17 @@ export async function verifyBogTransaction(
       .eq('id', tx.id)
       .neq('status', 'approved')
     if (error) throw error
+    logSkip(tx, 'rejected', statusKey, paidAmount, verifiedExternal)
     return { outcome: 'rejected' }
   }
 
   if (!APPROVED.has(statusKey)) {
+    logSkip(tx, 'pending', statusKey, paidAmount, verifiedExternal)
     return { outcome: 'pending' }
   }
 
-  const paidAmount = bogPaidAmount(verified)
-  const expectedAmount = Number(tx.final_amount || 0)
   if (paidAmount !== null && Math.abs(paidAmount - expectedAmount) > AMOUNT_TOLERANCE_GEL) {
-    console.error(
-      `BOG amount mismatch for ${tx.id}: paid ${paidAmount} GEL, expected ${expectedAmount} GEL`
-    )
+    logSkip(tx, 'amount_mismatch', statusKey, paidAmount, verifiedExternal)
     return { outcome: 'amount_mismatch' }
   }
 

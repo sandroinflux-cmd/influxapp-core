@@ -6,6 +6,12 @@ import { verifyBogTransaction } from '@/lib/verifyBogTransaction'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const NO_STORE = { 'Cache-Control': 'no-store, max-age=0' }
+
+function json(body: unknown, status = 200) {
+  return NextResponse.json(body, { status, headers: NO_STORE })
+}
+
 function adminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -39,16 +45,16 @@ async function findTransaction(supabase: ReturnType<typeof adminClient>, id: str
 export async function GET(request: Request) {
   try {
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+      return json({ error: 'Server configuration error' }, 500)
     }
 
     const url = new URL(request.url)
     const id = url.searchParams.get('id') || url.searchParams.get('txid') || url.searchParams.get('tx')
-    if (!id) return NextResponse.json({ error: 'Transaction id is required' }, { status: 400 })
+    if (!id) return json({ error: 'Transaction id is required' }, 400)
 
     const supabase = adminClient()
     let tx = await findTransaction(supabase, id)
-    if (!tx) return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+    if (!tx) return json({ error: 'Transaction not found' }, 404)
 
     if (tx.status === 'pending' && tx.bog_order_id) {
       try {
@@ -68,7 +74,7 @@ export async function GET(request: Request) {
       ? await supabase.from('profiles').select('full_name').eq('id', tx.brand_id).maybeSingle()
       : { data: null }
 
-    return NextResponse.json({
+    return json({
       id: tx.id,
       status: tx.status ?? null,
       final_amount: Number(tx.final_amount || 0),
@@ -80,6 +86,6 @@ export async function GET(request: Request) {
       customer_phone: tx.customer_phone ? maskGeorgianPhone(tx.customer_phone) : null,
     })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Receipt lookup failed' }, { status: 500 })
+    return json({ error: error.message || 'Receipt lookup failed' }, 500)
   }
 }

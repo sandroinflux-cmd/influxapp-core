@@ -11,7 +11,6 @@ type Receipt = {
   deal_title: string | null
   brand_name: string | null
   gift_description: string | null
-  delivery_estimate: string | null
   customer_city: string | null
   customer_phone: string | null
 }
@@ -44,6 +43,7 @@ function SuccessContent() {
   const [receipt, setReceipt] = useState<Receipt | null>(null)
   const [phase, setPhase] = useState<'checking' | 'approved' | 'rejected' | 'timeout' | 'missing' | 'error'>('checking')
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     if (!txId) {
@@ -51,44 +51,107 @@ function SuccessContent() {
       return
     }
 
-    let stopped = false
+    let cancelled = false
+    let settled = false
     const started = Date.now()
-    let timer = 0
+    let pollTimer = 0
+    let watchdog = 0
+    const deadlineMs = 14000
+
+    const stopPolling = () => {
+      settled = true
+      window.clearTimeout(pollTimer)
+      window.clearTimeout(watchdog)
+    }
+
+    watchdog = window.setTimeout(() => {
+      if (cancelled || settled) return
+      settled = true
+      window.clearTimeout(pollTimer)
+      setPhase((current) => (current === 'approved' || current === 'rejected' || current === 'error' ? current : 'timeout'))
+    }, deadlineMs)
 
     const poll = async () => {
+      if (cancelled || settled) return
+      if (Date.now() - started >= deadlineMs) {
+        if (!settled) {
+          settled = true
+          window.clearTimeout(watchdog)
+          setPhase('timeout')
+        }
+        return
+      }
+
+      const controller = new AbortController()
+      const abortTimer = window.setTimeout(() => controller.abort(), 8000)
       try {
-        const response = await fetch(`/api/payments/receipt?id=${encodeURIComponent(txId)}`, { cache: 'no-store' })
+        const response = await fetch(
+          `/api/payments/receipt?id=${encodeURIComponent(txId)}&_=${Date.now()}`,
+          {
+            cache: 'no-store',
+            signal: controller.signal,
+            headers: {
+              'Cache-Control': 'no-cache',
+              Pragma: 'no-cache',
+            },
+          }
+        )
         const data = await response.json().catch(() => ({}))
-        if (stopped) return
-        if (!response.ok) throw new Error(data.error || 'შეკვეთა ვერ მოიძებნა')
+        if (cancelled) return
+
+        if (!response.ok) {
+          if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
+            setError(data.error || 'შეკვეთა ვერ მოიძებნა')
+            stopPolling()
+            setPhase('error')
+            return
+          }
+          if (Date.now() - started >= deadlineMs) {
+            stopPolling()
+            setPhase('timeout')
+            return
+          }
+          pollTimer = window.setTimeout(poll, 2000)
+          return
+        }
 
         setReceipt(data)
         if (data.status === 'approved') {
+          stopPolling()
           setPhase('approved')
           return
         }
         if (data.status === 'rejected') {
+          stopPolling()
           setPhase('rejected')
           return
         }
-        if (Date.now() - started >= 14000) {
+        if (Date.now() - started >= deadlineMs) {
+          stopPolling()
           setPhase('timeout')
           return
         }
-        timer = window.setTimeout(poll, 2000)
-      } catch (err: any) {
-        if (stopped) return
-        setError(err?.message || 'შეკვეთა ვერ მოიძებნა')
-        setPhase('error')
+        pollTimer = window.setTimeout(poll, 2000)
+      } catch {
+        if (cancelled || settled) return
+        if (Date.now() - started >= deadlineMs) {
+          stopPolling()
+          setPhase('timeout')
+          return
+        }
+        pollTimer = window.setTimeout(poll, 2000)
+      } finally {
+        window.clearTimeout(abortTimer)
       }
     }
 
     poll()
     return () => {
-      stopped = true
-      window.clearTimeout(timer)
+      cancelled = true
+      window.clearTimeout(pollTimer)
+      window.clearTimeout(watchdog)
     }
-  }, [txId])
+  }, [txId, attempt])
 
   if (phase === 'checking') {
     return (
@@ -133,12 +196,15 @@ function SuccessContent() {
     return (
       <Shell>
         <div className="space-y-4 text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-emerald-500/20 border-t-emerald-400" />
           <h1 className="text-xl font-black">გადახდა მოწმდება...</h1>
           <p className="text-sm text-white/60">დადასტურებას ცოტა მეტი დრო სჭირდება. განაახლე გვერდი რამდენიმე წამში.</p>
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              setError(null)
+              setPhase('checking')
+              setAttempt((value) => value + 1)
+            }}
             className="w-full rounded-2xl bg-white py-4 text-sm font-black text-black"
           >
             განახლება
@@ -151,6 +217,8 @@ function SuccessContent() {
   const orderId = receipt?.id || txId || ''
   const customerCity = receipt?.customer_city?.trim() || ''
   const showCity = customerCity.length > 0 && customerCity !== '—' && customerCity !== '-' && customerCity !== '–'
+  const brandName = receipt?.brand_name?.trim() || ''
+  const maskedPhone = receipt?.customer_phone?.trim() || ''
 
   return (
     <Shell>
@@ -158,6 +226,9 @@ function SuccessContent() {
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300">დადასტურებულია</p>
         <h1 className="mt-2 text-3xl font-black">შეკვეთა მიღებულია</h1>
         <p className="mt-2 text-sm text-white/60">Order #{shortOrderId(orderId)}</p>
+        <p className="mt-2 text-sm text-white/80">
+          შეკვეთა უკვე გადაეცა {brandName ? `${brandName}-ს` : 'ბრენდს'}
+        </p>
 
         <dl className="mt-6 space-y-3 text-sm">
           <div className="flex items-start justify-between gap-4">
@@ -176,27 +247,33 @@ function SuccessContent() {
             <dt className="text-white/50">საჩუქარი</dt>
             <dd className="text-right font-bold">{receipt?.gift_description || '—'}</dd>
           </div>
-          <div className="flex items-start justify-between gap-4">
-            <dt className="text-white/50">მიტანა</dt>
-            <dd className="text-right font-bold">{receipt?.delivery_estimate || '—'}</dd>
-          </div>
           {showCity && (
             <div className="flex items-start justify-between gap-4">
               <dt className="text-white/50">ქალაქი</dt>
               <dd className="text-right font-bold">{customerCity}</dd>
             </div>
           )}
-          {receipt?.customer_phone && (
+          {maskedPhone && (
             <div className="flex items-start justify-between gap-4">
               <dt className="text-white/50">ტელეფონი</dt>
-              <dd className="text-right font-bold tracking-wider">{receipt.customer_phone}</dd>
+              <dd className="text-right font-bold tracking-wider">{maskedPhone}</dd>
             </div>
           )}
         </dl>
 
+        <p className="mt-4 text-sm leading-relaxed text-white/70">
+          {maskedPhone
+            ? `მალე დაგიკავშირდებიან WhatsApp-ზე (${maskedPhone})`
+            : 'მალე დაგიკავშირდებიან WhatsApp-ზე'}
+        </p>
+        <p className="mt-2 text-xs text-white/40">შეინახე ამ ეკრანის სქრინშოთი შეკვეთის ნომრით</p>
+        <p className="mt-5 text-xs leading-relaxed text-white/55">
+          გადახდა დაცულია InfluX-ის მიერ — ნებისმიერ კითხვაზე მოგვწერე WhatsApp-ში
+        </p>
+
         <a
           href={whatsappHref(orderId)}
-          className="mt-6 flex w-full items-center justify-center rounded-2xl bg-[#25D366] py-4 text-base font-black text-black"
+          className="mt-3 flex w-full items-center justify-center rounded-2xl bg-[#25D366] py-4 text-base font-black text-black"
         >
           WhatsApp მხარდაჭერა
         </a>

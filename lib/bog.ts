@@ -26,10 +26,50 @@ export async function getBogToken() {
   return data.access_token as string
 }
 
+const PAYMENT_STATES = new Set([
+  'completed',
+  'approved',
+  'success',
+  'paid',
+  'rejected',
+  'failed',
+  'cancelled',
+  'canceled',
+  'processing',
+  'created',
+  'pending',
+  'refunded',
+  'refunded_partially',
+  'refund_requested',
+  'auth_requested',
+  'blocked',
+  'partial_completed',
+])
+
+/** Receipt payloads are sometimes wrapped in `body` / `data`. */
+export function unwrapBogOrder(payload: any): any {
+  let current = payload
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (!current || typeof current !== 'object' || Array.isArray(current)) return current
+    const hasOrder =
+      'order_status' in current ||
+      'purchase_units' in current ||
+      'payment_detail' in current ||
+      'external_order_id' in current
+    if (hasOrder) return current
+    const nested = current.body ?? current.data
+    if (!nested || nested === current || typeof nested !== 'object' || Array.isArray(nested)) return current
+    current = nested
+  }
+  return current
+}
+
 export async function fetchBogOrder(orderId: string) {
   const token = await getBogToken()
+  // Create-order is POST /ecommerce/orders. Status lives on the receipt URL
+  // returned as _links.details.href.
   const response = await fetch(
-    `https://api.bog.ge/payments/v1/ecommerce/orders/${encodeURIComponent(orderId)}`,
+    `https://api.bog.ge/payments/v1/receipt/${encodeURIComponent(orderId)}`,
     {
       method: 'GET',
       headers: {
@@ -37,20 +77,53 @@ export async function fetchBogOrder(orderId: string) {
         'Accept-Language': 'ka',
       },
       cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
     }
   )
 
   if (!response.ok) {
+    console.error('[BOG verify] order lookup failed', { orderId, status: response.status })
     throw new Error(`BOG verification failed (${response.status})`)
   }
 
-  return response.json()
+  return unwrapBogOrder(await response.json())
+}
+
+function statusKeyFrom(value: unknown) {
+  if (value && typeof value === 'object') {
+    return String((value as { key?: unknown }).key || '').trim().toLowerCase()
+  }
+  if (typeof value === 'string') return value.trim().toLowerCase()
+  return ''
+}
+
+function descriptionIsSuccess(description: string) {
+  const text = description.trim().toLowerCase()
+  if (!text) return false
+  if (/(unsuccessful|declin|reject|fail|error|უარყოფ)/.test(text)) return false
+  return (
+    text.includes('successful payment') ||
+    text.includes('წარმატებული გადახდა') ||
+    text === 'success' ||
+    text === 'successful' ||
+    text === 'approved' ||
+    text === 'paid' ||
+    text === 'completed'
+  )
 }
 
 export function bogStatusKey(order: any) {
-  const status = order?.order_status ?? order?.status
-  if (status && typeof status === 'object') {
-    return String(status.key || '').trim().toLowerCase()
-  }
-  return String(status || '').trim().toLowerCase()
+  const source = unwrapBogOrder(order)
+  const orderStatusKey = statusKeyFrom(source?.order_status)
+  if (orderStatusKey) return orderStatusKey
+
+  const statusKey = statusKeyFrom(source?.status)
+  if (statusKey && PAYMENT_STATES.has(statusKey)) return statusKey
+
+  const detail = source?.payment_detail
+  const code = String(detail?.code ?? '').trim()
+  // 100 is BOG's successful-payment response code. 200 is only a pre-authorization.
+  if (code === '100') return 'completed'
+  if (descriptionIsSuccess(String(detail?.code_description || ''))) return 'success'
+  return ''
 }
