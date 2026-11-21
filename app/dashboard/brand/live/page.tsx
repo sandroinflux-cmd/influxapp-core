@@ -24,6 +24,12 @@ function telHref(phone: string) {
   return `tel:${phone.replace(/[^\d+]/g, '')}`
 }
 
+function presentText(value: unknown) {
+  const text = typeof value === 'string' ? value.trim() : ''
+  if (!text || text === '—' || text === '-' || text === '–') return null
+  return text
+}
+
 export default function LivePulsePage() {
   const [transactions, setTransactions] = useState<any[]>([])
   const [stats, setStats] = useState({ count24h: 0, value24h: 0 })
@@ -146,7 +152,11 @@ export default function LivePulsePage() {
       <div className="space-y-4">
         <AnimatePresence initial={false}>
           {transactions.map((tx) => {
-            const phone = String(tx.customer_phone || '').trim()
+            const name = presentText(tx.customer_name)
+            const phone = presentText(tx.customer_phone)
+            const city = presentText(tx.customer_city)
+            const address = presentText(tx.customer_address)
+            const note = presentText(tx.delivery_note)
             const fulfillment = String(tx.fulfillment_status || 'pending')
             return (
               <motion.div
@@ -168,17 +178,15 @@ export default function LivePulsePage() {
                   </div>
                   <div className="min-w-0 flex-1 rounded-3xl border border-white/10 bg-white/[0.03] p-4 normal-case not-italic font-semibold">
                     <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/35 italic">Delivery</p>
-                    <p className="mt-2 text-base font-black text-white">{tx.customer_name || '—'}</p>
+                    {name ? <p className="mt-2 text-sm font-black text-white">{name}</p> : null}
                     {phone ? (
-                      <a href={telHref(phone)} className="mt-1 inline-flex text-sm font-black text-emerald-400">{phone}</a>
-                    ) : (
-                      <p className="mt-1 text-sm text-white/35">No phone</p>
-                    )}
-                    <p className="mt-2 text-sm text-white/80">{tx.customer_city || '—'}</p>
-                    <p className="text-sm leading-snug text-white">{tx.customer_address || '—'}</p>
-                    {tx.delivery_note && (
-                      <p className="mt-2 rounded-xl bg-amber-400/10 px-3 py-2 text-sm text-amber-100">{tx.delivery_note}</p>
-                    )}
+                      <a href={telHref(phone)} className="mt-1 inline-flex text-2xl font-black tracking-tight text-emerald-400">{phone}</a>
+                    ) : null}
+                    {city ? <p className="mt-2 text-sm text-white/80">{city}</p> : null}
+                    {address ? <p className={`${city || phone || name ? 'mt-1' : 'mt-2'} text-base leading-snug text-white`}>{address}</p> : null}
+                    {note ? (
+                      <p className="mt-2 rounded-xl bg-amber-400/10 px-3 py-2 text-sm text-amber-100">{note}</p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2 normal-case not-italic">

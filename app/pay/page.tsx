@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { motion } from 'framer-motion'
 import { isGeorgianMobilePhone } from '@/lib/phone'
 import { trackTokenEvent } from '@/lib/trackTokenEvent'
 
@@ -27,6 +28,8 @@ type ProfileRow = {
   full_name: string | null
   avatar_url: string | null
   username?: string | null
+  bio?: string | null
+  sector?: string | null
 }
 
 type PartnershipRow = {
@@ -43,21 +46,38 @@ type Checkout = {
   influencer: ProfileRow | null
 }
 
-const CITIES = ['თბილისი', 'რეგიონი'] as const
+const BUYER_MESSAGE: Record<string, string> = {
+  DEAL_NOT_FOUND: 'შეთავაზება ვერ მოიძებნა',
+  PARTNERSHIP_INACTIVE: 'ეს შეთავაზება არ არის აქტიური',
+  REF_REQUIRED: 'გახსენი ინფლუენსერის ბმული',
+  DEAL_INACTIVE: 'შეთავაზება დროებით გათიშულია',
+  PRICE_NOT_SET: 'ფასი ჯერ არ არის დაყენებული',
+  SOLD_OUT: 'ამოიწურა',
+  DB_ERROR: 'შეთავაზება დროებით მიუწვდომელია. სცადე თავიდან.',
+}
 
-function formatGel(value: number) {
-  if (!Number.isFinite(value)) return '0'
-  return Number.isInteger(value) ? String(value) : value.toFixed(2)
+function buyerMessage(code?: string, fallback?: string) {
+  if (code && BUYER_MESSAGE[code]) return BUYER_MESSAGE[code]
+  if (fallback) return fallback
+  return BUYER_MESSAGE.DEAL_NOT_FOUND
 }
 
 function isHttpUrl(value: string | null | undefined): value is string {
   return typeof value === 'string' && value.startsWith('http')
 }
 
-function dealUnavailable(deal: DealRow) {
+function initialsFromName(name: string | null) {
+  if (!name) return ''
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return ''
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return parts[0].slice(0, 2).toUpperCase()
+}
+
+function dealSoldOut(deal: DealRow) {
   const limit = Number(deal.stock_limit || 0)
   const sold = Number(deal.stock_sold || 0)
-  return deal.is_active !== true || (limit > 0 && sold >= limit)
+  return deal.is_active === false || (limit > 0 && sold >= limit)
 }
 
 function CheckoutContent() {
@@ -68,12 +88,8 @@ function CheckoutContent() {
   const [checkout, setCheckout] = useState<Checkout | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
-  const [customerCity, setCustomerCity] = useState<(typeof CITIES)[number]>('თბილისი')
   const [customerAddress, setCustomerAddress] = useState('')
-  const [deliveryNote, setDeliveryNote] = useState('')
-  const [marketingOptIn, setMarketingOptIn] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [forcedSoldOut, setForcedSoldOut] = useState(false)
@@ -84,8 +100,9 @@ function CheckoutContent() {
 
     const load = async () => {
       if (!dealId) {
+        console.error('[Checkout Load Error]', { code: 'DEAL_NOT_FOUND', detail: 'Missing deal query parameter' })
         setLoading(false)
-        setLoadError('შეთავაზება ვერ მოიძებნა')
+        setLoadError(BUYER_MESSAGE.DEAL_NOT_FOUND)
         return
       }
 
@@ -98,12 +115,40 @@ function CheckoutContent() {
         const params = new URLSearchParams({ deal: dealId })
         if (influencerId) params.set('ref', influencerId)
         const response = await fetch(`/api/public/checkout?${params.toString()}`)
-        const data = await response.json().catch(() => ({}))
-        if (!response.ok || !data?.deal || !data?.partnership) {
-          throw new Error(typeof data?.error === 'string' ? data.error : 'შეთავაზება ვერ მოიძებნა')
+        const data = await response.json().catch(() => null)
+        if (cancelled) return
+
+        if (!data || typeof data !== 'object') {
+          console.error('[Checkout Load Error]', { code: 'DB_ERROR', detail: 'Unreadable checkout response', status: response.status })
+          setLoadError(BUYER_MESSAGE.DB_ERROR)
+          return
         }
 
-        if (cancelled) return
+        const code = typeof data.code === 'string' ? data.code : undefined
+        const detail = typeof data.detail === 'string' ? data.detail : undefined
+        const soldOutPayload = code === 'SOLD_OUT' || data.isSoldOut === true
+        if (soldOutPayload && data.deal && data.partnership) {
+          setCheckout({
+            deal: data.deal as DealRow,
+            partnership: data.partnership as PartnershipRow,
+            brand: (data.brand as ProfileRow | null) || null,
+            influencer: (data.influencer as ProfileRow | null) || null,
+          })
+          setForcedSoldOut(true)
+          return
+        }
+
+        if (!response.ok || !data.deal || !data.partnership) {
+          console.error('[Checkout Load Error]', {
+            code: code || 'UNKNOWN',
+            detail,
+            error: typeof data.error === 'string' ? data.error : undefined,
+            status: response.status,
+          })
+          setLoadError(buyerMessage(code, typeof data.error === 'string' ? data.error : undefined))
+          return
+        }
+
         setCheckout({
           deal: data.deal as DealRow,
           partnership: data.partnership as PartnershipRow,
@@ -111,7 +156,8 @@ function CheckoutContent() {
           influencer: (data.influencer as ProfileRow | null) || null,
         })
       } catch (error: any) {
-        if (!cancelled) setLoadError(error?.message || 'შეთავაზება ვერ მოიძებნა')
+        console.error('[Checkout Load Error]', { code: 'DB_ERROR', detail: error?.message || 'Network error' })
+        if (!cancelled) setLoadError(BUYER_MESSAGE.DB_ERROR)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -142,15 +188,9 @@ function CheckoutContent() {
     event.preventDefault()
     if (!checkout || submitting) return
 
-    const name = customerName.trim()
     const phone = customerPhone.trim()
     const address = customerAddress.trim()
-    const note = deliveryNote.trim()
 
-    if (name.length < 2) {
-      setFormError('შეიყვანე სახელი')
-      return
-    }
     if (!isGeorgianMobilePhone(phone)) {
       setFormError('შეიყვანე ნომერი ფორმატით 5XXXXXXXX')
       return
@@ -182,16 +222,12 @@ function CheckoutContent() {
         body: JSON.stringify({
           dealId: checkout.deal.id,
           influencerId: trackedInfluencerId,
-          customerName: name,
           customerPhone: phone,
-          customerCity,
           customerAddress: address,
-          deliveryNote: note,
-          marketingOptIn,
         }),
       })
       const data = await response.json().catch(() => ({}))
-      if (response.status === 409 || data?.error === 'SOLD_OUT') {
+      if (response.status === 409 || data?.error === 'SOLD_OUT' || data?.code === 'SOLD_OUT') {
         setForcedSoldOut(true)
         setSubmitting(false)
         return
@@ -208,20 +244,32 @@ function CheckoutContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#010201] text-white">
-        <div className="h-12 w-12 animate-spin rounded-full border-2 border-emerald-500/20 border-t-emerald-400" />
-        <p className="text-sm text-white/70">იტვირთება...</p>
-      </div>
+      <main className="min-h-screen bg-[#010201] text-white flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98105,transparent_70%)] pointer-events-none" />
+        <div className="flex flex-col items-center gap-6 relative z-10">
+          <div className="w-16 h-16 border-4 border-emerald-500/10 border-t-emerald-500 rounded-full animate-spin" />
+          <p className="text-emerald-500 font-black animate-pulse tracking-[0.5em] uppercase italic text-[10px]">Secure Checkout</p>
+        </div>
+      </main>
     )
   }
 
   if (loadError || !checkout) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#010201] px-6 text-center text-white">
-        <div className="max-w-sm space-y-3">
-          <p className="text-lg font-black">შეთავაზება მიუწვდომელია</p>
-          <p className="text-sm text-white/60">{loadError || 'შეთავაზება ვერ მოიძებნა'}</p>
-        </div>
+      <main className="min-h-screen bg-[#010201] text-white flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98105,transparent_70%)] pointer-events-none" />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="relative z-10 flex w-full max-w-[400px] flex-col items-center justify-center border-2 border-red-500/20 rounded-[45px] bg-black/40 p-12 text-center gap-6 shadow-[0_0_80px_rgba(239,68,68,0.05)]"
+        >
+          <div className="h-16 w-16 rounded-full border-2 border-red-500/30 flex items-center justify-center">
+            <span className="text-red-500 text-3xl font-mono">!</span>
+          </div>
+          <h2 className="text-xl font-black text-white uppercase italic tracking-tighter leading-tight">
+            {loadError || BUYER_MESSAGE.DEAL_NOT_FOUND}
+          </h2>
+        </motion.div>
       </main>
     )
   }
@@ -229,106 +277,139 @@ function CheckoutContent() {
   const { deal, brand, influencer } = checkout
   const price = Number(deal.price || 0)
   const original = Number(deal.original_price || 0)
+  const showOriginal = Number.isFinite(original) && original > price && price > 0
+  const off = showOriginal ? Math.round((1 - price / original) * 100) : 0
   const stockLimit = Number(deal.stock_limit || 0)
   const stockSold = Number(deal.stock_sold || 0)
   const remaining = Math.max(0, stockLimit - stockSold)
-  const soldOut = forcedSoldOut || dealUnavailable(deal)
-  const influencerName = influencer?.full_name || influencer?.username || ''
-  const influencerAvatarUrl = influencer?.avatar_url
-  const influencerAvatar = isHttpUrl(influencerAvatarUrl) ? influencerAvatarUrl : null
+  const soldOut = forcedSoldOut || dealSoldOut(deal)
+  const influencerName = influencer?.full_name || null
+  const influencerHandle = influencer?.username ? '@' + String(influencer.username).replace(/^@/, '') : null
+  const influencerAvatar = isHttpUrl(influencer?.avatar_url) ? influencer.avatar_url : null
+  const influencerInitials = initialsFromName(influencerName || influencerHandle)
+  const showInfluencer = Boolean(influencer || influencerId)
+  const creatorLine = influencerName
+    ? `Token by ${influencerName}`
+    : influencerHandle
+      ? `Via ${influencerHandle}`
+      : null
   const brandName = brand?.full_name || deal.title || 'InfluX'
-  const brandAvatar = brand?.avatar_url
-  const brandLogo = isHttpUrl(brandAvatar) ? brandAvatar : (isHttpUrl(deal.logo) ? deal.logo : null)
-  const productImage = isHttpUrl(deal.image_url) ? deal.image_url : null
+  const brandLogo = isHttpUrl(brand?.avatar_url) ? brand.avatar_url : (isHttpUrl(deal.logo) ? deal.logo : null)
+  const brandMark = !brandLogo ? (deal.logo || '💎') : null
+  const productImage = isHttpUrl(deal.image_url) && deal.image_url !== brandLogo ? deal.image_url : null
+  const gift = deal.gift_description?.trim() || ''
+  const deliveryLine = [
+    deal.free_delivery_tbilisi ? 'უფასო მიტანა თბილისში' : null,
+    deal.delivery_estimate?.trim() || null,
+  ].filter(Boolean).join(' · ')
 
   return (
-    <main className="min-h-screen bg-[#010201] text-white">
-      <form onSubmit={pay} className="mx-auto flex w-full max-w-md flex-col px-5 pb-48 pt-6">
-        <header className="flex items-center gap-3">
-          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-white/10 bg-white/5">
-            {influencerAvatar ? (
-              <img src={influencerAvatar} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-sm font-black text-emerald-300">
-                {(influencerName || 'I').slice(0, 1)}
-              </div>
+    <main className="min-h-screen bg-[#010201] text-white flex flex-col items-center justify-center p-4 font-sans relative">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98105,transparent_70%)] pointer-events-none" />
+      <motion.form
+        onSubmit={pay}
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.35 }}
+        className="relative z-10 w-full max-w-[400px] bg-[#050505] border border-blue-500/30 rounded-[35px] p-6 sm:p-8 shadow-[0_0_80px_rgba(37,99,235,0.2)]"
+      >
+        <div className="flex flex-col items-center mb-6 border-b border-white/5 pb-6">
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <div className="h-14 w-14 shrink-0 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shadow-inner">
+              {brandLogo
+                ? <img src={brandLogo} alt="" className="h-full w-full object-cover" />
+                : <span className="text-2xl">{brandMark}</span>}
+            </div>
+            {showInfluencer && (
+              <>
+                <span className="text-[13px] text-white/30 font-light leading-none select-none">×</span>
+                <div className="h-14 w-14 shrink-0 rounded-full bg-[#07140f] border border-emerald-400/50 ring-2 ring-blue-500/30 flex items-center justify-center overflow-hidden shadow-[0_0_18px_rgba(16,185,129,0.28)]">
+                  {influencerAvatar
+                    ? <img src={influencerAvatar} alt={influencerName || 'creator'} className="h-full w-full object-cover" />
+                    : <span className="text-[13px] font-black italic text-emerald-300 tracking-widest">{influencerInitials || '•'}</span>}
+                </div>
+              </>
             )}
           </div>
-          <p className="text-sm font-semibold leading-snug">
-            რეკომენდებულია: {influencerName || 'InfluX'}
-          </p>
-        </header>
-
-        <div className="mt-5 flex items-center gap-3">
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
-            {brandLogo ? (
-              <img src={brandLogo} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-lg">{deal.logo || '💎'}</div>
-            )}
-          </div>
-          <p className="text-sm font-bold text-white/80">{brandName}</p>
+          <span className="text-xs font-black text-white uppercase italic tracking-widest text-center">{brandName}</span>
+          {creatorLine && (
+            <span className="text-[8px] font-black tracking-[0.28em] text-emerald-400/80 uppercase mt-1.5 italic text-center">
+              {creatorLine}
+            </span>
+          )}
+          <span className="text-[8px] font-black tracking-[0.4em] text-blue-500 uppercase mt-1 italic">Secure Checkout</span>
         </div>
 
-        {productImage && (
-          <img src={productImage} alt="" className="mt-5 aspect-[4/3] w-full rounded-[28px] object-cover" />
+        {(productImage || deal.title) && (
+          <div className="mb-5 flex items-center gap-3">
+            {productImage && (
+              <img src={productImage} alt="" className="h-14 w-14 shrink-0 rounded-2xl object-cover border border-white/10" />
+            )}
+            <div className="min-w-0">
+              <h1 className="text-sm font-black uppercase italic tracking-tight leading-tight text-white">
+                {deal.title || 'შეთავაზება'}
+              </h1>
+              {deal.description && (
+                <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-white/45">{deal.description}</p>
+              )}
+            </div>
+          </div>
         )}
 
-        <h1 className="mt-5 text-2xl font-black leading-tight">{deal.title || 'შეთავაზება'}</h1>
-        {deal.description && (
-          <p className="mt-2 text-sm leading-relaxed text-white/70">{deal.description}</p>
+        <div className="relative bg-white/5 rounded-[25px] p-6 border border-white/5 flex justify-between items-center overflow-hidden">
+          <div className="flex flex-col min-w-0">
+            <span className="text-[9px] text-gray-500 uppercase tracking-widest mb-1 font-bold">Total to Pay</span>
+            {showOriginal && (
+              <span className="mb-1 flex items-center gap-2">
+                <span className="text-sm font-light text-white/35 line-through">{original.toFixed(2)}</span>
+                {off > 0 && (
+                  <span className="text-[9px] font-black tracking-[0.16em] text-emerald-400/80">{off}% OFF</span>
+                )}
+              </span>
+            )}
+            <span className="text-3xl font-black text-white leading-none">
+              {price.toFixed(2)} <span className="text-sm font-light text-gray-400">GEL</span>
+            </span>
+          </div>
+
+          <div className="absolute right-6 h-12 w-12 flex items-center justify-center">
+            <motion.div
+              animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+              transition={{ repeat: Infinity, duration: 3 }}
+              className="absolute h-full w-full rounded-full bg-blue-500/10 border border-blue-500/20"
+            />
+            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_10px_4px_rgba(37,99,235,0.7)]" />
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}
+              className="absolute h-[140%] w-[140%] border-[2px] border-dotted border-blue-500/30 rounded-full"
+            />
+          </div>
+        </div>
+
+        {(gift || (stockLimit > 0 && !soldOut) || deliveryLine) && (
+          <div className="mt-4 space-y-2 text-center">
+            {gift && (
+              <p className="text-[11px] font-bold italic leading-snug text-amber-200/80">🎁 {gift}</p>
+            )}
+            {stockLimit > 0 && !soldOut && (
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/35">დარჩა {remaining}</p>
+            )}
+            {deliveryLine && (
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/35">{deliveryLine}</p>
+            )}
+          </div>
         )}
-
-        <section className="mt-6 rounded-[28px] border border-white/10 bg-white/[0.03] p-5">
-          <div className="flex items-end gap-3">
-            <p className="text-4xl font-black tracking-tight">{formatGel(price)} ₾</p>
-            {original > price && (
-              <p className="pb-1 text-base text-white/40 line-through">{formatGel(original)} ₾</p>
-            )}
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {deal.gift_description && (
-              <span className="rounded-full border border-amber-300/40 bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-100">
-                {deal.gift_description}
-              </span>
-            )}
-            {deal.free_delivery_tbilisi && (
-              <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-200">
-                უფასო მიტანა თბილისში
-              </span>
-            )}
-            {stockLimit > 0 && (
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-white/80">
-                დარჩა {remaining} / {stockLimit}
-              </span>
-            )}
-          </div>
-
-          {deal.delivery_estimate && (
-            <p className="mt-4 text-sm text-white/70">{deal.delivery_estimate}</p>
-          )}
-        </section>
 
         {soldOut ? (
-          <div className="mt-6 rounded-[28px] border border-red-400/30 bg-red-500/10 px-5 py-8 text-center">
-            <p className="text-xl font-black">ამოიწურა / SOLD OUT</p>
-            <p className="mt-2 text-sm text-white/60">ეს შეთავაზება ამ წუთას მიუწვდომელია.</p>
+          <div className="mt-6 rounded-[25px] border border-red-500/20 bg-red-500/5 px-5 py-6 text-center">
+            <p className="text-sm font-black uppercase italic tracking-[0.28em] text-red-400">Sold Out</p>
+            <p className="mt-2 text-[11px] font-bold text-white/50">ამოიწურა</p>
           </div>
         ) : (
-          <section className="mt-6 space-y-3">
+          <div className="mt-6 space-y-4">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold text-white/55">სახელი</span>
-              <input
-                required
-                autoComplete="name"
-                value={customerName}
-                onChange={(event) => setCustomerName(event.target.value)}
-                className="w-full rounded-2xl bg-white px-4 py-4 text-base text-black outline-none"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold text-white/55">ტელეფონი</span>
+              <span className="text-[9px] text-gray-500 uppercase tracking-widest mb-2 block text-center font-bold">ტელეფონის ნომერი</span>
               <input
                 required
                 type="tel"
@@ -337,70 +418,36 @@ function CheckoutContent() {
                 placeholder="5XXXXXXXX"
                 value={customerPhone}
                 onChange={(event) => setCustomerPhone(event.target.value)}
-                className="w-full rounded-2xl bg-white px-4 py-4 text-base text-black outline-none"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-5 text-base font-bold text-white text-center focus:border-blue-500 outline-none transition-all placeholder:text-white/25"
               />
             </label>
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold text-white/55">ქალაქი</span>
-              <select
-                required
-                value={customerCity}
-                onChange={(event) => setCustomerCity(event.target.value as (typeof CITIES)[number])}
-                className="w-full rounded-2xl bg-white px-4 py-4 text-base text-black outline-none"
-              >
-                {CITIES.map((city) => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold text-white/55">მისამართი</span>
+              <span className="text-[9px] text-gray-500 uppercase tracking-widest mb-2 block text-center font-bold">მისამართი</span>
               <input
                 required
                 autoComplete="street-address"
+                placeholder="ქუჩა, სადარბაზო, სართული"
                 value={customerAddress}
                 onChange={(event) => setCustomerAddress(event.target.value)}
-                className="w-full rounded-2xl bg-white px-4 py-4 text-base text-black outline-none"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-5 text-base font-bold text-white text-center focus:border-blue-500 outline-none transition-all placeholder:text-white/25"
               />
             </label>
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold text-white/55">შენიშვნა</span>
-              <input
-                value={deliveryNote}
-                onChange={(event) => setDeliveryNote(event.target.value)}
-                placeholder="სადარბაზო / სართული"
-                className="w-full rounded-2xl bg-white px-4 py-4 text-base text-black outline-none placeholder:text-black/35"
-              />
-            </label>
-            <label className="flex items-start gap-3 rounded-2xl border border-white/10 px-4 py-4">
-              <input
-                type="checkbox"
-                checked={marketingOptIn}
-                onChange={(event) => setMarketingOptIn(event.target.checked)}
-                className="mt-1 h-4 w-4 accent-emerald-500"
-              />
-              <span className="text-sm leading-snug text-white/80">
-                მსურს მივიღო InfluX-ის დახურული შეთავაზებები და ფასდაკლებები
-              </span>
-            </label>
-          </section>
+          </div>
         )}
 
-        {formError && <p className="mt-4 text-center text-sm font-semibold text-red-300">{formError}</p>}
+        {formError && (
+          <p className="mt-4 text-center text-[11px] font-bold text-red-400">{formError}</p>
+        )}
 
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-[#010201]/95 px-5 py-4 backdrop-blur">
-          <div className="mx-auto w-full max-w-md">
-            <button
-              type="submit"
-              disabled={soldOut || submitting || price <= 0}
-              className="w-full rounded-2xl bg-emerald-500 py-4 text-base font-black text-black disabled:bg-white/10 disabled:text-white/40"
-            >
-              {soldOut ? 'ამოიწურა / SOLD OUT' : submitting ? 'ბანკზე გადასვლა...' : `გადახდა ${formatGel(price)} ₾`}
-            </button>
-            <p className="mt-2 text-center text-[11px] text-white/40">უსაფრთხო გადახდა · Bank of Georgia</p>
-          </div>
-        </div>
-      </form>
+        <button
+          type="submit"
+          disabled={soldOut || submitting || price <= 0}
+          className="mt-6 w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-20 py-5 rounded-2xl font-bold text-sm shadow-[0_15px_30px_rgba(37,99,235,0.3)] transition-all active:scale-95"
+        >
+          {soldOut ? 'ამოიწურა' : submitting ? 'ბანკზე გადასვლა...' : `გადახდა ${price.toFixed(2)} GEL`}
+        </button>
+        <p className="mt-3 text-center text-[8px] font-black tracking-[0.4em] text-blue-500 uppercase italic">Bank of Georgia</p>
+      </motion.form>
     </main>
   )
 }

@@ -80,24 +80,32 @@ function previewSound() {
   void unlockAudio().then(() => playChaChingSound()).catch(() => {})
 }
 
+function presentText(value: string | null | undefined) {
+  const text = value?.trim() || ''
+  if (!text || text === '—' || text === '-' || text === '–') return null
+  return text
+}
+
 function DeliveryBlock({ tx }: { tx: MonitorTransaction }) {
-  const phone = tx.customer_phone?.trim() || ''
+  const name = presentText(tx.customer_name)
+  const phone = presentText(tx.customer_phone)
+  const city = presentText(tx.customer_city)
+  const address = presentText(tx.customer_address)
+  const note = presentText(tx.delivery_note)
   return (
-    <div className="mt-3 space-y-1.5 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 text-left">
+    <div className="mt-3 space-y-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 text-left">
       <p className="text-[9px] font-black uppercase tracking-[0.28em] text-white/35">Delivery</p>
-      <p className="text-base font-black leading-tight text-white">{tx.customer_name?.trim() || '—'}</p>
+      {name ? <p className="text-sm font-bold leading-tight text-white">{name}</p> : null}
       {phone ? (
-        <a href={telHref(phone)} className="inline-flex text-sm font-black text-emerald-300">
+        <a href={telHref(phone)} className="inline-flex text-2xl font-black tracking-tight text-emerald-300">
           {phone}
         </a>
-      ) : (
-        <p className="text-sm font-bold text-white/35">No phone</p>
-      )}
-      <p className="text-sm font-bold text-white/80">{tx.customer_city?.trim() || '—'}</p>
-      <p className="text-sm font-semibold leading-snug text-white">{tx.customer_address?.trim() || '—'}</p>
-      {tx.delivery_note?.trim() ? (
+      ) : null}
+      {city ? <p className="text-sm font-bold text-white/80">{city}</p> : null}
+      {address ? <p className="text-base font-semibold leading-snug text-white">{address}</p> : null}
+      {note ? (
         <p className="rounded-xl bg-amber-400/10 px-3 py-2 text-sm font-semibold leading-snug text-amber-100">
-          {tx.delivery_note.trim()}
+          {note}
         </p>
       ) : null}
     </div>

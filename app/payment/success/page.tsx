@@ -149,6 +149,8 @@ function SuccessContent() {
   }
 
   const orderId = receipt?.id || txId || ''
+  const customerCity = receipt?.customer_city?.trim() || ''
+  const showCity = customerCity.length > 0 && customerCity !== '—' && customerCity !== '-' && customerCity !== '–'
 
   return (
     <Shell>
@@ -178,10 +180,10 @@ function SuccessContent() {
             <dt className="text-white/50">მიტანა</dt>
             <dd className="text-right font-bold">{receipt?.delivery_estimate || '—'}</dd>
           </div>
-          {receipt?.customer_city && (
+          {showCity && (
             <div className="flex items-start justify-between gap-4">
               <dt className="text-white/50">ქალაქი</dt>
-              <dd className="text-right font-bold">{receipt.customer_city}</dd>
+              <dd className="text-right font-bold">{customerCity}</dd>
             </div>
           )}
           {receipt?.customer_phone && (

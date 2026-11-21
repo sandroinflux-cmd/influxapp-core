@@ -6,8 +6,6 @@ import { compactPhone, isGeorgianMobilePhone } from '@/lib/phone'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const CITIES = new Set(['თბილისი', 'რეგიონი'])
-
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -108,19 +106,12 @@ export async function POST(request: Request) {
 
     const dealId = readText(body?.dealId)
     const influencerId = readText(body?.influencerId)
-    const customerName = readText(body?.customerName)
     const customerPhone = readText(body?.customerPhone)
-    const customerCity = readText(body?.customerCity)
     const customerAddress = readText(body?.customerAddress)
-    const deliveryNote = readText(body?.deliveryNote)
-    const marketingOptIn = body?.marketingOptIn === true
 
     if (!dealId) return bad('dealId is required')
-    if (customerName.length < 2 || customerName.length > 120) return bad('Invalid customerName')
     if (!isGeorgianMobilePhone(customerPhone)) return bad('Invalid phone')
-    if (!CITIES.has(customerCity)) return bad('Invalid customerCity')
     if (!customerAddress || customerAddress.length > 400) return bad('Invalid customerAddress')
-    if (deliveryNote.length > 400) return bad('Invalid deliveryNote')
 
     const supabase = adminClient()
 
@@ -133,17 +124,19 @@ export async function POST(request: Request) {
     if (dealError) throw dealError
     if (!deal) return bad('Deal not found', 404)
 
-    let partnershipQuery = supabase
+    const { data: partnershipRows, error: partnershipError } = await supabase
       .from('partnerships')
       .select('*')
       .eq('deal_id', dealId)
-      .eq('status', 'active')
 
-    if (influencerId) partnershipQuery = partnershipQuery.eq('influencer_id', influencerId)
-
-    const { data: partnerships, error: partnershipError } = await partnershipQuery.limit(2)
     if (partnershipError) throw partnershipError
-    if (!partnerships || partnerships.length === 0) return bad('Active partnership required')
+    const activePartnerships = (partnershipRows || []).filter((row) => {
+      return String(row.status || '').trim().toLowerCase() === 'active'
+    })
+    const partnerships = influencerId
+      ? activePartnerships.filter((row) => row.influencer_id === influencerId)
+      : activePartnerships
+    if (partnerships.length === 0) return bad('Active partnership required')
     if (!influencerId && partnerships.length > 1) return bad('influencerId required')
 
     const partnership = partnerships[0]
@@ -153,7 +146,7 @@ export async function POST(request: Request) {
     const stockSold = Number(deal.stock_sold || 0)
     const inStock = !deal.stock_limit || stockLimit === 0 || stockSold < stockLimit
 
-    if (deal.is_active !== true || !inStock) {
+    if (deal.is_active === false || !inStock) {
       return NextResponse.json({ error: 'SOLD_OUT' }, { status: 409 })
     }
     if (!(finalAmount > 0)) return bad('Invalid deal price')
@@ -230,12 +223,12 @@ export async function POST(request: Request) {
         fulfillment_status: 'pending',
         payout_status: payoutStatus,
         category: deal.category ?? null,
-        customer_name: customerName,
+        customer_name: null,
         customer_phone: phone,
-        customer_city: customerCity,
+        customer_city: null,
         customer_address: customerAddress,
-        delivery_note: deliveryNote || null,
-        marketing_opt_in: marketingOptIn,
+        delivery_note: null,
+        marketing_opt_in: false,
         gift_unlocked: Boolean(deal.gift_description),
         gift_description: deal.gift_description || null,
       }])

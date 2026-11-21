@@ -91,13 +91,13 @@ export async function GET(request: Request) {
       .from('partnerships')
       .select(`id, status, is_pushed_to_token, brand_id, deal_id, deals(${DEAL_FIELDS})`)
       .eq('influencer_id', profile.id)
-      .eq('status', 'active')
       .eq('is_pushed_to_token', true)
 
     if (partnershipError) throw partnershipError
 
     const partnerships = (rows || []).flatMap((row: any) => {
-      if (row.status !== 'active' || row.is_pushed_to_token !== true) return []
+      const status = String(row.status || '').trim().toLowerCase()
+      if (status !== 'active' || row.is_pushed_to_token !== true) return []
       const deal = publicDeal(row.deals)
       if (!deal) return []
       return [{

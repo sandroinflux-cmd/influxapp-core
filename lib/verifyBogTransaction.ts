@@ -194,6 +194,11 @@ export async function verifyBogTransaction(
     const sold = Number(dealResult.data?.stock_sold || 0)
     const remainingLabel = limit > 0 ? `${Math.max(0, limit - sold)} / ${limit}` : '—'
     const paid = Number(tx.final_amount || 0).toFixed(2)
+    const customerName = asText(tx.customer_name)
+    const customerPhone = asText(tx.customer_phone)
+    const customerCity = asText(tx.customer_city)
+    const customerAddress = asText(tx.customer_address)
+    const deliveryNote = asText(tx.delivery_note)
     const lines = [
       'InfluX — ახალი შეკვეთა',
       `Order: ${shortOrderId(tx.id)}`,
@@ -202,13 +207,13 @@ export async function verifyBogTransaction(
       `Deal: ${dealTitle}`,
       `Paid: ${paid} GEL`,
       `Gift: ${tx.gift_description || '—'}`,
-      `Customer: ${tx.customer_name || '—'}`,
-      `Phone: ${tx.customer_phone || '—'}`,
-      `City: ${tx.customer_city || '—'}`,
-      `Address: ${tx.customer_address || '—'}`,
-      `Note: ${tx.delivery_note || '—'}`,
-      `Remaining stock: ${remainingLabel}`,
     ]
+    if (customerName) lines.push(`Customer: ${customerName}`)
+    lines.push(`Phone: ${customerPhone}`)
+    if (customerCity) lines.push(`City: ${customerCity}`)
+    lines.push(`Address: ${customerAddress}`)
+    if (deliveryNote) lines.push(`Note: ${deliveryNote}`)
+    lines.push(`Remaining stock: ${remainingLabel}`)
     if (oversell) lines.unshift('⚠️ OVERSELL ALERT: stock_limit exceeded!')
 
     await notifyAdmin(lines.join('\n'))

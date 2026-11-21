@@ -104,7 +104,7 @@ export default function BrandDealsPage() {
     setGiftDescription(deal.gift_description || '')
     setFreeDelivery(Boolean(deal.free_delivery_tbilisi))
     setDeliveryEstimate(deal.delivery_estimate || '')
-    setIsActive(deal.is_active === true)
+    setIsActive(deal.is_active !== false)
     setNewShare(String(deal.totalShare ?? ''))
     setIsCreating(true)
   }
@@ -155,7 +155,7 @@ export default function BrandDealsPage() {
         gift_description: giftDescription.trim() || null,
         free_delivery_tbilisi: freeDelivery,
         delivery_estimate: deliveryEstimate.trim() || null,
-        is_active: isActive,
+        is_active: isActive ? true : false,
         totalShare: Math.round(parsedShare),
       },
     }

@@ -6,6 +6,15 @@ export const dynamic = 'force-dynamic'
 
 const DEAL_FIELDS = 'id, brand_id, title, description, image_url, logo, price, original_price, gift_description, free_delivery_tbilisi, delivery_estimate, stock_limit, stock_sold, is_active'
 
+type CheckoutErrorCode =
+  | 'DEAL_NOT_FOUND'
+  | 'PARTNERSHIP_INACTIVE'
+  | 'REF_REQUIRED'
+  | 'DEAL_INACTIVE'
+  | 'PRICE_NOT_SET'
+  | 'SOLD_OUT'
+  | 'DB_ERROR'
+
 function adminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,6 +36,16 @@ function asText(value: unknown) {
 
 function invalidLookup(message?: string) {
   return /invalid input syntax/i.test(message || '')
+}
+
+function isActiveStatus(status: unknown) {
+  return String(status || '').trim().toLowerCase() === 'active'
+}
+
+function fail(code: CheckoutErrorCode, status: number, error: string, detail?: string) {
+  const body: { error: string; code: CheckoutErrorCode; detail?: string } = { error, code }
+  if (detail) body.detail = detail
+  return noStore(body, status)
 }
 
 function publicDeal(row: any) {
@@ -52,13 +71,15 @@ function publicDeal(row: any) {
 export async function GET(request: Request) {
   try {
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return noStore({ error: 'Server configuration error' }, 500)
+      return fail('DB_ERROR', 500, 'შეთავაზება დროებით მიუწვდომელია', 'Missing Supabase configuration')
     }
 
     const url = new URL(request.url)
     const dealId = asText(url.searchParams.get('deal'))
     const influencerId = asText(url.searchParams.get('ref'))
-    if (!dealId) return noStore({ error: 'deal is required' }, 400)
+    if (!dealId) {
+      return fail('DEAL_NOT_FOUND', 404, 'შეთავაზება ვერ მოიძებნა', 'deal is required')
+    }
 
     const supabase = adminClient()
     const { data: dealRow, error: dealError } = await supabase
@@ -68,38 +89,54 @@ export async function GET(request: Request) {
       .maybeSingle()
 
     if (dealError) {
-      if (invalidLookup(dealError.message)) return noStore({ error: 'შეთავაზება ვერ მოიძებნა' }, 404)
-      throw dealError
+      if (invalidLookup(dealError.message)) {
+        return fail('DEAL_NOT_FOUND', 404, 'შეთავაზება ვერ მოიძებნა', dealError.message)
+      }
+      return fail('DB_ERROR', 500, 'შეთავაზება დროებით მიუწვდომელია', dealError.message)
     }
 
     const deal = publicDeal(dealRow)
-    if (!deal) return noStore({ error: 'შეთავაზება ვერ მოიძებნა' }, 404)
+    if (!deal) return fail('DEAL_NOT_FOUND', 404, 'შეთავაზება ვერ მოიძებნა')
 
-    let partnershipQuery = supabase
+    if (deal.is_active === false) {
+      return fail('DEAL_INACTIVE', 400, 'შეთავაზება დროებით გათიშულია')
+    }
+
+    const price = Number(deal.price)
+    if (!Number.isFinite(price) || price <= 0) {
+      return fail('PRICE_NOT_SET', 400, 'ფასი ჯერ არ არის დაყენებული')
+    }
+
+    const { data: partnershipRows, error: partnershipError } = await supabase
       .from('partnerships')
       .select('id, status, influencer_cut_pct, total_percentage, influencer_id')
       .eq('deal_id', dealId)
-      .eq('status', 'active')
 
-    if (influencerId) partnershipQuery = partnershipQuery.eq('influencer_id', influencerId)
-
-    const { data: partnerships, error: partnershipError } = await partnershipQuery.limit(2)
     if (partnershipError) {
-      if (invalidLookup(partnershipError.message)) return noStore({ error: 'ეს შეთავაზება არ არის აქტიური' }, 404)
-      throw partnershipError
-    }
-    if (!partnerships || partnerships.length === 0) {
-      return noStore({ error: 'ეს შეთავაზება არ არის აქტიური' }, 404)
-    }
-    if (!influencerId && partnerships.length > 1) {
-      return noStore({ error: 'გახსენი ინფლუენსერის ბმული' }, 400)
+      if (invalidLookup(partnershipError.message)) {
+        return fail('PARTNERSHIP_INACTIVE', 404, 'ეს შეთავაზება არ არის აქტიური', partnershipError.message)
+      }
+      return fail('DB_ERROR', 500, 'შეთავაზება დროებით მიუწვდომელია', partnershipError.message)
     }
 
-    const partnershipRow = partnerships[0]
-    if (partnershipRow.status !== 'active') {
-      return noStore({ error: 'ეს შეთავაზება არ არის აქტიური' }, 404)
+    const activePartnerships = (partnershipRows || []).filter((row) => isActiveStatus(row.status))
+    const matched = influencerId
+      ? activePartnerships.filter((row) => row.influencer_id === influencerId)
+      : activePartnerships
+
+    if (matched.length === 0) {
+      return fail(
+        'PARTNERSHIP_INACTIVE',
+        404,
+        'ეს შეთავაზება არ არის აქტიური',
+        influencerId ? 'No active partnership for deal and ref' : 'No active partnership for deal'
+      )
+    }
+    if (!influencerId && matched.length > 1) {
+      return fail('REF_REQUIRED', 400, 'გახსენი ინფლუენსერის ბმული', 'ref is required when multiple active partnerships exist')
     }
 
+    const partnershipRow = matched[0]
     const [brandResult, influencerResult] = await Promise.all([
       deal.brand_id
         ? supabase.from('profiles').select('id, full_name, avatar_url, bio, sector').eq('id', deal.brand_id).maybeSingle()
@@ -109,8 +146,12 @@ export async function GET(request: Request) {
         : Promise.resolve({ data: null, error: null }),
     ])
 
-    if (brandResult.error) throw brandResult.error
-    if (influencerResult.error) throw influencerResult.error
+    if (brandResult.error) {
+      return fail('DB_ERROR', 500, 'შეთავაზება დროებით მიუწვდომელია', brandResult.error.message)
+    }
+    if (influencerResult.error) {
+      return fail('DB_ERROR', 500, 'შეთავაზება დროებით მიუწვდომელია', influencerResult.error.message)
+    }
 
     const brand = brandResult.data
       ? {
@@ -131,7 +172,11 @@ export async function GET(request: Request) {
         }
       : null
 
-    return noStore({
+    const stockLimit = Number(deal.stock_limit ?? 0)
+    const stockSold = Number(deal.stock_sold ?? 0)
+    const isSoldOut = Number.isFinite(stockLimit) && stockLimit > 0 && Number.isFinite(stockSold) && stockSold >= stockLimit
+
+    const payload = {
       deal,
       partnership: {
         id: partnershipRow.id,
@@ -141,9 +186,21 @@ export async function GET(request: Request) {
       },
       brand,
       influencer,
-    })
+      isSoldOut,
+    }
+
+    if (isSoldOut) {
+      return noStore({
+        ...payload,
+        error: 'ამოიწურა',
+        code: 'SOLD_OUT' satisfies CheckoutErrorCode,
+      }, 409)
+    }
+
+    return noStore(payload)
   } catch (error: any) {
-    console.error('Public checkout lookup failed:', error?.message || error)
-    return noStore({ error: 'შეთავაზება ვერ მოიძებნა' }, 500)
+    const detail = error?.message || 'Public checkout lookup failed'
+    console.error('Public checkout lookup failed:', detail)
+    return fail('DB_ERROR', 500, 'შეთავაზება დროებით მიუწვდომელია', detail)
   }
 }

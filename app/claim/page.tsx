@@ -15,7 +15,7 @@ function formatOffer(deal: any) {
   const price = Number(deal?.price || 0)
   const limit = Number(deal?.stock_limit || 0)
   const sold = Number(deal?.stock_sold || 0)
-  const exhausted = deal?.is_active !== true || (limit > 0 && sold >= limit)
+  const exhausted = deal?.is_active === false || (limit > 0 && sold >= limit)
   if (exhausted) return 'SOLD'
   const off = priceOffPct(deal)
   if (off > 0) return `${off}% OFF`
@@ -61,7 +61,7 @@ function ClaimContent() {
 
       const rows = Array.isArray(data.partnerships) ? data.partnerships : []
       setLiveDeals(rows.flatMap((row: any, index: number) => {
-        if (row.status !== 'active' || row.is_pushed_to_token !== true) return []
+        if (String(row.status || '').trim().toLowerCase() !== 'active' || row.is_pushed_to_token !== true) return []
         const deal = row.deal
         const dealId = row.deal_id || deal?.id || null
         if (!dealId) return []
