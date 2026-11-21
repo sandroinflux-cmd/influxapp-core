@@ -33,10 +33,10 @@ export default function BrandNavbar() {
       {/* 🚀 100% გამჭვირვალე ფონი (bg-transparent) */}
       <div className="w-full max-w-7xl bg-transparent border border-white/10 rounded-[30px] px-8 py-3 flex justify-between items-center pointer-events-auto">
         
-        <div className="flex items-center gap-2.5 cursor-pointer min-w-0" onClick={() => router.push('/dashboard/brand')}>
-          <img src="/influx-logo.png" alt="INFLUX" className="h-6 sm:h-7 w-auto object-contain shrink-0" />
-          <span className="text-[11px] font-black tracking-[0.3em] uppercase italic text-blue-500 shrink-0">
-            Core
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push('/dashboard/brand')}>
+          <div className="h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_10px_#3b82f6]" />
+          <span className="text-[11px] font-black tracking-[0.4em] uppercase italic text-white">
+            Influx <span className="text-blue-500">Core</span>
           </span>
         </div>
 

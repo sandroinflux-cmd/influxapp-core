@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -19,16 +19,7 @@ const brandMenuItems = [
 
 export default function BrandSidebar({ status = 'approved' }: { status?: string }) {
   const [isExpanded, setIsExpanded] = useState(false)
-  const [isDesktop, setIsDesktop] = useState(false)
   const pathname = usePathname()
-
-  useEffect(() => {
-    const media = window.matchMedia('(min-width: 768px)')
-    const sync = () => setIsDesktop(media.matches)
-    sync()
-    media.addEventListener('change', sync)
-    return () => media.removeEventListener('change', sync)
-  }, [])
 
   // 🛡️ თუ იუზერი pending არის, მარტო Settings-ს ვუტოვებთ!
   const displayedItems = status === 'pending' 
@@ -38,18 +29,22 @@ export default function BrandSidebar({ status = 'approved' }: { status?: string 
   return (
     <motion.aside 
       initial={false}
-      animate={{ width: isExpanded ? 280 : isDesktop ? 168 : 100 }}
+      animate={{ width: isExpanded ? 280 : 100 }}
       transition={{ duration: 0.2, ease: "circOut" }}
       onHoverStart={() => setIsExpanded(true)}
       onHoverEnd={() => setIsExpanded(false)}
-      className="h-screen bg-[#010201] border-r border-blue-500/10 flex flex-col px-2 py-8 backdrop-blur-3xl sticky top-0 overflow-y-auto no-scrollbar z-[100]"
+      className="h-screen bg-[#010201] border-r border-blue-500/10 flex flex-col p-8 backdrop-blur-3xl sticky top-0 overflow-y-auto no-scrollbar z-[100]"
     >
       <div className="mb-16 flex flex-col items-center">
-        <img
-          src="/influx-logo.png"
-          alt="INFLUX"
-          className={`object-contain ${isExpanded ? 'h-8 w-auto max-w-full' : isDesktop ? 'h-7 w-auto max-w-full' : 'h-auto w-full'}`}
-        />
+        <h1 className="text-2xl font-black text-white tracking-tighter italic">
+          {isExpanded ? (
+            <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.1 }}>
+              INFLU<span className="text-blue-500 not-italic drop-shadow-[0_0_12px_rgba(59,130,246,0.5)]">X</span>
+            </motion.span>
+          ) : (
+            <span className="text-blue-500 not-italic">X</span>
+          )}
+        </h1>
         {isExpanded && (
           <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.1 }} className="h-[1px] w-12 bg-blue-500/30 mt-4" />
         )}

@@ -126,7 +126,7 @@ export default function TermsOfUse() {
       
       {/* 🛰️ Cyber Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-white/5 px-6 md:px-10 h-20 flex items-center justify-between">
-        <img src="/influx-logo.png" alt="INFLUX" className="h-8 w-auto object-contain" />
+        <h1 className="text-xl font-black italic tracking-tighter text-emerald-500">INFLUX</h1>
         <button 
           onClick={() => router.push('/')}
           className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500 hover:text-white transition-colors"
