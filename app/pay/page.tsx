@@ -3,6 +3,7 @@
 import { FormEvent, Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
+import BrandMark from '@/components/BrandMark'
 import { isGeorgianMobilePhone } from '@/lib/phone'
 import { trackTokenEvent } from '@/lib/trackTokenEvent'
 
@@ -234,8 +235,9 @@ function CheckoutContent() {
       setFormError('შეიყვანე ნომერი ფორმატით 5XXXXXXXX')
       return
     }
+    const isDeliveryDeal = Boolean(checkout.deal.free_delivery_tbilisi || checkout.deal.delivery_estimate?.trim())
     if (!address) {
-      setFormError('შეიყვანე მისამართი')
+      setFormError(isDeliveryDeal ? 'შეიყვანე მისამართი' : 'შეიყვანე სახელი და გვარი')
       return
     }
 
@@ -283,29 +285,21 @@ function CheckoutContent() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#010201] text-white flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98105,transparent_70%)] pointer-events-none" />
-        <div className="flex flex-col items-center gap-6 relative z-10">
-          <div className="w-16 h-16 border-4 border-emerald-500/10 border-t-emerald-500 rounded-full animate-spin" />
-          <p className="text-emerald-500 font-black animate-pulse tracking-[0.5em] uppercase italic text-[10px]">Secure Checkout</p>
-        </div>
+      <main className="flex min-h-screen flex-col items-center justify-center bg-[#090808] p-6 text-[#F2EFE9]">
+        <div className="h-8 w-8 animate-spin rounded-full border border-[#C9B087]/25 border-t-[#C9B087]" />
       </main>
     )
   }
 
   if (loadError || !checkout) {
     return (
-      <main className="min-h-screen bg-[#010201] text-white flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98105,transparent_70%)] pointer-events-none" />
+      <main className="flex min-h-screen flex-col items-center justify-center bg-[#090808] p-6 text-[#F2EFE9]">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="relative z-10 flex w-full max-w-[400px] flex-col items-center justify-center border-2 border-red-500/20 rounded-[45px] bg-black/40 p-12 text-center gap-6 shadow-[0_0_80px_rgba(239,68,68,0.05)]"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex w-full max-w-[400px] flex-col items-center justify-center gap-4 rounded-2xl border border-white/[0.08] bg-[#121011] px-8 py-12 text-center shadow-[inset_0_1px_0_rgba(242,239,233,0.08)]"
         >
-          <div className="h-16 w-16 rounded-full border-2 border-red-500/30 flex items-center justify-center">
-            <span className="text-red-500 text-3xl font-mono">!</span>
-          </div>
-          <h2 className="text-xl font-black text-white uppercase italic tracking-tighter leading-tight">
+          <h2 className="font-editorial text-lg font-medium leading-snug text-[#F2EFE9]">
             {loadError || BUYER_MESSAGE.DEAL_NOT_FOUND}
           </h2>
         </motion.div>
@@ -315,157 +309,118 @@ function CheckoutContent() {
 
   const { deal, brand, influencer } = checkout
   const price = Number(deal.price || 0)
-  const original = Number(deal.original_price || 0)
-  const showOriginal = Number.isFinite(original) && original > price && price > 0
-  const off = showOriginal ? Math.round((1 - price / original) * 100) : 0
+  const priceLabel = Number.isInteger(price) ? String(price) : price.toFixed(2)
   const stockLimit = Number(deal.stock_limit || 0)
   const stockSold = Number(deal.stock_sold || 0)
   const remaining = Math.max(0, stockLimit - stockSold)
   const soldOut = forcedSoldOut || dealSoldOut(deal)
   const influencerName = influencer?.full_name || null
-  const influencerHandle = influencer?.username ? '@' + String(influencer.username).replace(/^@/, '') : null
   const influencerAvatar = isHttpUrl(influencer?.avatar_url) ? influencer.avatar_url : null
-  const influencerInitials = initialsFromName(influencerName || influencerHandle)
+  const influencerInitials = initialsFromName(influencerName)
   const showInfluencer = Boolean(influencer || influencerId)
-  const creatorLine = influencerName
-    ? `Token by ${influencerName}`
-    : influencerHandle
-      ? `Via ${influencerHandle}`
-      : null
   const brandName = brand?.full_name || deal.title || 'InfluX'
   const brandLogo = isHttpUrl(brand?.avatar_url) ? brand.avatar_url : (isHttpUrl(deal.logo) ? deal.logo : null)
-  const brandMark = !brandLogo ? (deal.logo || '💎') : null
+  const brandMark = !brandLogo ? (deal.logo || '◆') : null
   const productImage = isHttpUrl(deal.image_url) && deal.image_url !== brandLogo ? deal.image_url : null
   const gift = deal.gift_description?.trim() || ''
+  const isDeliveryDeal = Boolean(deal.free_delivery_tbilisi || deal.delivery_estimate?.trim())
   const deliveryLine = [
     deal.free_delivery_tbilisi ? 'უფასო მიტანა თბილისში' : null,
     deal.delivery_estimate?.trim() || null,
   ].filter(Boolean).join(' · ')
+  const fieldClass = 'w-full rounded-lg border border-white/[0.08] bg-transparent px-4 py-3.5 font-sans text-sm text-[#F2EFE9] outline-none transition-colors placeholder:text-[#8C8580] focus:border-[#C9B087]/40 focus:ring-1 focus:ring-[#C9B087]/40'
 
   return (
-    <main className="min-h-screen bg-[#010201] text-white flex flex-col items-center justify-center p-4 font-sans relative">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98105,transparent_70%)] pointer-events-none" />
-      <div className="relative z-10 flex w-full max-w-[400px] flex-col items-center">
+    <main className="relative flex min-h-screen flex-col items-center overflow-hidden bg-[#090808] px-4 py-8 text-[#F2EFE9]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[46vh] bg-[radial-gradient(ellipse_at_top,rgba(92,24,39,0.28),transparent_62%)]" />
+      <div className="relative my-auto flex w-full max-w-[400px] flex-col items-center">
         <div className="mb-5 flex w-full items-center justify-center">
-          <img
-            src="/influx-logo.png"
-            alt="InfluX"
-            className="h-5 w-auto max-w-full object-contain sm:h-6"
-          />
+          <BrandMark size="sm" />
         </div>
       <motion.form
         onSubmit={pay}
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
-        className="w-full bg-[#050505] border border-blue-500/30 rounded-[35px] p-6 sm:p-8 shadow-[0_0_80px_rgba(37,99,235,0.2)]"
+        className="w-full rounded-2xl border border-white/[0.08] bg-[#121011] p-6 shadow-[inset_0_1px_0_rgba(242,239,233,0.08)] sm:p-8"
       >
-        <div className="flex flex-col items-center mb-6 border-b border-white/5 pb-6">
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <div className="h-14 w-14 shrink-0 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shadow-inner">
+        <div className="flex flex-col items-center border-b border-white/[0.07] pb-6">
+          <div className="mb-3 flex items-center justify-center gap-3">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#C9B087]/25 bg-[#1E0E12]">
               {brandLogo
                 ? <img src={brandLogo} alt="" className="h-full w-full object-cover" />
-                : <span className="text-2xl">{brandMark}</span>}
+                : <span className="font-editorial text-lg text-[#F2EFE9]">{brandMark}</span>}
             </div>
             {showInfluencer && (
               <>
-                <span className="text-[13px] text-white/30 font-light leading-none select-none">×</span>
-                <div className="h-14 w-14 shrink-0 rounded-full bg-[#07140f] border border-emerald-400/50 ring-2 ring-blue-500/30 flex items-center justify-center overflow-hidden shadow-[0_0_18px_rgba(16,185,129,0.28)]">
+                <span className="select-none font-editorial text-sm font-light leading-none text-[#C9B087]">×</span>
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/[0.08] bg-[#0E0C0D]">
                   {influencerAvatar
-                    ? <img src={influencerAvatar} alt={influencerName || 'creator'} className="h-full w-full object-cover" />
-                    : <span className="text-[13px] font-black italic text-emerald-300 tracking-widest">{influencerInitials || '•'}</span>}
+                    ? <img src={influencerAvatar} alt={influencerName || ''} className="h-full w-full object-cover" />
+                    : <span className="font-sans text-xs font-medium tracking-[0.12em] text-[#F2EFE9]">{influencerInitials || '•'}</span>}
                 </div>
               </>
             )}
           </div>
-          <span className="text-xs font-black text-white uppercase italic tracking-widest text-center">{brandName}</span>
-          {creatorLine && (
-            <span className="text-[8px] font-black tracking-[0.28em] text-emerald-400/80 uppercase mt-1.5 italic text-center">
-              {creatorLine}
+          <span className="text-center font-editorial text-xl font-medium text-[#F2EFE9]">{brandName}</span>
+          {influencerName && (
+            <span className="mt-1.5 text-center font-sans text-xs tracking-[0.08em] text-[#C9B087]">
+              {influencerName}-ს VIP წვდომა
             </span>
           )}
-          <span className="text-[8px] font-black tracking-[0.4em] text-blue-500 uppercase mt-1 italic">Secure Checkout</span>
         </div>
 
         {(productImage || deal.title) && (
-          <div className="mb-5 flex items-center gap-3">
+          <div className="flex items-center gap-3 border-b border-white/[0.07] py-5">
             {productImage && (
-              <img src={productImage} alt="" className="h-14 w-14 shrink-0 rounded-2xl object-cover border border-white/10" />
+              <img src={productImage} alt="" className="h-14 w-14 shrink-0 rounded-lg border border-white/[0.08] object-cover" />
             )}
             <div className="min-w-0">
-              <h1 className="text-sm font-black uppercase italic tracking-tight leading-tight text-white">
+              <h1 className="font-editorial text-lg font-medium leading-snug text-[#F2EFE9]">
                 {deal.title || 'შეთავაზება'}
               </h1>
               {deal.description && (
-                <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-white/45">{deal.description}</p>
+                <p className="mt-1 line-clamp-2 font-sans text-[13px] leading-snug text-[#8C8580]">{deal.description}</p>
               )}
             </div>
           </div>
         )}
 
-        <div className="relative bg-white/5 rounded-[25px] p-6 border border-white/5 flex justify-between items-center overflow-hidden">
-          <div className="flex flex-col min-w-0">
-            <span className="text-[9px] text-gray-500 uppercase tracking-widest mb-1 font-bold">Total to Pay</span>
-            {showOriginal && (
-              <span className="mb-1 flex items-center gap-2">
-                <span className="text-sm font-light text-white/35 line-through">{original.toFixed(2)}</span>
-                {off > 0 && (
-                  <span className="text-[9px] font-black tracking-[0.16em] text-emerald-400/80">{off}% OFF</span>
-                )}
-              </span>
-            )}
-            <span className="text-3xl font-black text-white leading-none">
-              {price.toFixed(2)} <span className="text-sm font-light text-gray-400">GEL</span>
+        <div className="flex items-end justify-between gap-4 border-b border-white/[0.07] py-6">
+          <p className="font-editorial text-4xl font-medium leading-none text-[#F2EFE9]">
+            {priceLabel}<span className="ml-1 text-2xl font-normal opacity-75">₾</span>
+          </p>
+          {stockLimit > 0 && !soldOut && (
+            <span className="shrink-0 rounded-lg border border-[#C9B087]/25 bg-gradient-to-r from-[#1E0E12] via-[#131011] to-[#0E0C0D] px-2.5 py-1 font-sans text-[10px] tracking-[0.12em] text-[#C9B087]">
+              დარჩა {remaining} / {stockLimit}
             </span>
-          </div>
-
-          <div className="absolute right-6 h-12 w-12 flex items-center justify-center">
-            <motion.div
-              animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
-              transition={{ repeat: Infinity, duration: 3 }}
-              className="absolute h-full w-full rounded-full bg-blue-500/10 border border-blue-500/20"
-            />
-            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 shadow-[0_0_10px_4px_rgba(37,99,235,0.7)]" />
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ repeat: Infinity, duration: 10, ease: 'linear' }}
-              className="absolute h-[140%] w-[140%] border-[2px] border-dotted border-blue-500/30 rounded-full"
-            />
-          </div>
+          )}
         </div>
 
         {gift && (
-          <div className="mt-4 flex items-center gap-3 rounded-[22px] border border-amber-200/15 bg-amber-300/[0.045] px-3 py-3">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-amber-200/25 bg-amber-300/10 text-amber-100 shadow-[0_0_24px_rgba(251,191,36,0.12)]">
+          <div className="mt-5 flex items-center gap-3 rounded-lg border border-[#C9B087]/25 bg-gradient-to-r from-[#4A1420]/30 to-[#C9B087]/[0.06] px-4 py-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center text-[#C9B087]">
               <GiftBoxIcon />
             </div>
             <div className="min-w-0 flex-1 text-left">
-              <p className="text-[8px] font-black uppercase tracking-[0.28em] text-amber-200/50">საჩუქარი</p>
-              <p className="mt-1 break-words text-[13px] font-bold leading-snug text-amber-50/90">{gift}</p>
+              <p className="font-sans text-[11px] tracking-[0.14em] text-[#C9B087]">VIP პრივილეგია</p>
+              <p className="mt-1 break-words font-sans text-sm leading-snug text-[#F2EFE9]">{gift}</p>
             </div>
           </div>
         )}
 
-        {((stockLimit > 0 && !soldOut) || deliveryLine) && (
-          <div className="mt-3 space-y-2 text-center">
-            {stockLimit > 0 && !soldOut && (
-              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-white/35">დარჩა {remaining}</p>
-            )}
-            {deliveryLine && (
-              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/35">{deliveryLine}</p>
-            )}
-          </div>
+        {isDeliveryDeal && deliveryLine && (
+          <p className="mt-3 text-center font-sans text-xs text-[#8C8580]">{deliveryLine}</p>
         )}
 
         {soldOut ? (
-          <div className="mt-6 rounded-[25px] border border-red-500/20 bg-red-500/5 px-5 py-6 text-center">
-            <p className="text-sm font-black uppercase italic tracking-[0.28em] text-red-400">Sold Out</p>
-            <p className="mt-2 text-[11px] font-bold text-white/50">ამოიწურა</p>
+          <div className="mt-6 border-t border-white/[0.07] py-6 text-center">
+            <p className="font-sans text-sm text-[#F2EFE9]">ამოიწურა</p>
           </div>
         ) : (
           <div className="mt-6 space-y-4">
             <label className="block">
-              <span className="text-[9px] text-gray-500 uppercase tracking-widest mb-2 block text-center font-bold">ტელეფონის ნომერი</span>
+              <span className="mb-2 block font-sans text-xs tracking-[0.08em] text-[#8C8580]">ტელეფონის ნომერი</span>
               <input
                 required
                 type="tel"
@@ -474,55 +429,63 @@ function CheckoutContent() {
                 placeholder="5XXXXXXXX"
                 value={customerPhone}
                 onChange={(event) => setCustomerPhone(event.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-5 text-base font-bold text-white text-center focus:border-blue-500 outline-none transition-all placeholder:text-white/25"
+                className={fieldClass}
               />
             </label>
             <label className="block">
-              <span className="text-[9px] text-gray-500 uppercase tracking-widest mb-2 block text-center font-bold">მისამართი</span>
+              <span className="mb-2 block font-sans text-xs tracking-[0.08em] text-[#8C8580]">
+                {isDeliveryDeal ? 'მიტანის მისამართი' : 'სახელი და გვარი'}
+              </span>
               <input
                 required
-                autoComplete="street-address"
-                placeholder="ქუჩა, სადარბაზო, სართული"
+                autoComplete={isDeliveryDeal ? 'street-address' : 'name'}
+                placeholder={isDeliveryDeal ? 'ქუჩა, სადარბაზო, სართული' : 'მაგ: ნინო ბერიძე'}
                 value={customerAddress}
                 onChange={(event) => setCustomerAddress(event.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-5 text-base font-bold text-white text-center focus:border-blue-500 outline-none transition-all placeholder:text-white/25"
+                className={fieldClass}
               />
             </label>
           </div>
         )}
 
         {formError && (
-          <p className="mt-4 text-center text-[11px] font-bold text-red-400">{formError}</p>
+          <p className="mt-4 text-center font-sans text-sm text-red-300/90">{formError}</p>
         )}
 
         <button
           type="submit"
           disabled={soldOut || submitting || price <= 0}
-          className="mt-6 w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-20 py-5 rounded-2xl font-bold text-sm shadow-[0_15px_30px_rgba(37,99,235,0.3)] transition-all active:scale-95"
+          className="mt-6 w-full rounded-lg bg-[#F2EFE9] py-4 font-sans text-xs font-semibold uppercase tracking-[0.14em] text-[#090808] transition-colors hover:bg-[#E7DEC8] disabled:opacity-30"
         >
-          {soldOut ? 'ამოიწურა' : submitting ? 'ბანკზე გადასვლა...' : `გადახდა ${price.toFixed(2)} GEL`}
+          {soldOut ? 'ამოიწურა' : submitting ? 'ბანკზე გადასვლა...' : `გადახდა ${priceLabel} ₾`}
         </button>
         {!soldOut && (
-          <div className="mt-3 flex w-full min-w-0 flex-col items-center gap-2">
+          <div className="mt-4 flex w-full min-w-0 flex-col items-center gap-3">
             <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5">
-              <span className="inline-flex h-7 items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] px-2.5 text-white">
+              <span className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 text-[#F2EFE9]">
                 <AppleMark />
-                <span className="text-[11px] font-semibold tracking-tight">Pay</span>
+                <span className="font-sans text-[11px] font-medium tracking-tight">Pay</span>
               </span>
-              <span className="inline-flex h-7 items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] px-2.5 text-white">
+              <span className="inline-flex h-7 items-center gap-1 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 text-[#F2EFE9]">
                 <GoogleMark />
-                <span className="text-[11px] font-medium tracking-tight text-white/90">Pay</span>
+                <span className="font-sans text-[11px] font-medium tracking-tight">Pay</span>
               </span>
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/55" aria-hidden="true">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-[#8C8580]" aria-hidden="true">
                 <CardMark />
               </span>
             </div>
-            <p className="max-w-full break-words px-1 text-center text-[10px] font-medium leading-snug text-white/55">
+            <p className="max-w-full px-1 text-center font-sans text-[11px] leading-snug text-[#8C8580]">
               შემდეგ გვერდზე შეგიძლია გადაიხადო Apple Pay, Google Pay ან ბარათით
             </p>
+            {!isDeliveryDeal && (
+              <div className="space-y-1 text-center font-sans text-[11px] leading-relaxed text-[#8C8580]">
+                <p>60 დღე ღია თარიღი</p>
+                <p>2 სთ-ში კონტაქტი WhatsApp-ზე</p>
+                <p>დაცულია საქართველოს ბანკით</p>
+              </div>
+            )}
           </div>
         )}
-        <p className="mt-3 text-center text-[8px] font-black tracking-[0.4em] text-blue-500 uppercase italic">Bank of Georgia</p>
       </motion.form>
       </div>
     </main>
@@ -531,7 +494,7 @@ function CheckoutContent() {
 
 export default function PaymentFlowPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#010201]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[#090808]" />}>
       <CheckoutContent />
     </Suspense>
   )

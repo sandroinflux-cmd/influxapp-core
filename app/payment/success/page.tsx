@@ -3,6 +3,7 @@
 import { ReactNode, Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import BrandMark, { BrandMonogram } from '@/components/BrandMark'
 
 type Receipt = {
   id: string
@@ -31,13 +32,10 @@ function whatsappHref(orderId: string) {
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#010201] px-5 py-10 text-white">
-      <div className="flex w-full max-w-md flex-col items-center">
-        <img
-          src="/influx-logo.png"
-          alt="InfluX"
-          className="mb-6 h-5 w-auto max-w-full object-contain sm:h-6"
-        />
+    <main className="relative flex min-h-screen flex-col items-center overflow-hidden bg-[#090808] px-5 py-10 text-[#F2EFE9]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[48vh] bg-[radial-gradient(ellipse_at_top,rgba(92,24,39,0.28),transparent_62%)]" />
+      <div className="relative my-auto flex w-full max-w-md flex-col items-center">
+        <BrandMark size="sm" className="mb-6" />
         <div className="w-full">{children}</div>
       </div>
     </main>
@@ -51,6 +49,7 @@ function SuccessContent() {
   const [phase, setPhase] = useState<'checking' | 'approved' | 'rejected' | 'timeout' | 'missing' | 'error'>('checking')
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!txId) {
@@ -164,8 +163,8 @@ function SuccessContent() {
     return (
       <Shell>
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="h-12 w-12 animate-spin rounded-full border-2 border-emerald-500/20 border-t-emerald-400" />
-          <p className="text-base font-semibold">გადახდა მოწმდება...</p>
+          <div className="h-8 w-8 animate-spin rounded-full border border-[#C9B087]/25 border-t-[#C9B087]" />
+          <p className="font-sans text-sm text-[#8C8580]">გადახდა მოწმდება...</p>
         </div>
       </Shell>
     )
@@ -175,9 +174,9 @@ function SuccessContent() {
     return (
       <Shell>
         <div className="space-y-3 text-center">
-          <h1 className="text-2xl font-black">შეკვეთა ვერ მოიძებნა</h1>
-          <p className="text-sm text-white/60">{error || 'Order reference is missing.'}</p>
-          <Link href="/" className="inline-block pt-2 text-sm font-bold text-emerald-300">
+          <h1 className="font-editorial text-2xl font-medium">შეკვეთა ვერ მოიძებნა</h1>
+          <p className="font-sans text-sm text-[#8C8580]">{error || 'ბმული არასრულია.'}</p>
+          <Link href="/" className="inline-block pt-2 font-sans text-sm tracking-[0.08em] text-[#C9B087]">
             მთავარზე
           </Link>
         </div>
@@ -188,11 +187,11 @@ function SuccessContent() {
   if (phase === 'rejected') {
     return (
       <Shell>
-        <div className="rounded-[28px] border border-red-400/30 bg-red-500/10 px-6 py-8 text-center">
-          <h1 className="text-2xl font-black">გადახდა ვერ შესრულდა</h1>
-          <p className="mt-2 text-sm text-white/70">Payment was not confirmed.</p>
+        <div className="rounded-2xl border border-white/[0.08] bg-[#121011] px-6 py-8 text-center shadow-[inset_0_1px_0_rgba(242,239,233,0.08)]">
+          <h1 className="font-editorial text-2xl font-medium">გადახდა ვერ შესრულდა</h1>
+          <p className="mt-2 font-sans text-sm text-[#8C8580]">გადახდა არ დადასტურდა.</p>
           {receipt?.id && (
-            <p className="mt-4 text-xs tracking-widest text-white/50">#{shortOrderId(receipt.id)}</p>
+            <p className="mt-4 font-mono text-xs tracking-[0.18em] text-[#8C8580]">#{shortOrderId(receipt.id)}</p>
           )}
         </div>
       </Shell>
@@ -203,8 +202,8 @@ function SuccessContent() {
     return (
       <Shell>
         <div className="space-y-4 text-center">
-          <h1 className="text-xl font-black">გადახდა მოწმდება...</h1>
-          <p className="text-sm text-white/60">დადასტურებას ცოტა მეტი დრო სჭირდება. განაახლე გვერდი რამდენიმე წამში.</p>
+          <h1 className="font-editorial text-xl font-medium">გადახდა მოწმდება...</h1>
+          <p className="font-sans text-sm text-[#8C8580]">დადასტურებას ცოტა მეტი დრო სჭირდება. განაახლე გვერდი რამდენიმე წამში.</p>
           <button
             type="button"
             onClick={() => {
@@ -212,7 +211,7 @@ function SuccessContent() {
               setPhase('checking')
               setAttempt((value) => value + 1)
             }}
-            className="w-full rounded-2xl bg-white py-4 text-sm font-black text-black"
+            className="w-full rounded-lg bg-[#F2EFE9] py-4 font-sans text-xs font-semibold uppercase tracking-[0.14em] text-[#090808] transition-colors hover:bg-[#E7DEC8]"
           >
             განახლება
           </button>
@@ -225,64 +224,89 @@ function SuccessContent() {
   const customerCity = receipt?.customer_city?.trim() || ''
   const showCity = customerCity.length > 0 && customerCity !== '—' && customerCity !== '-' && customerCity !== '–'
   const brandName = receipt?.brand_name?.trim() || ''
+  const dealTitle = receipt?.deal_title?.trim() || ''
+  const gift = receipt?.gift_description?.trim() || ''
   const maskedPhone = receipt?.customer_phone?.trim() || ''
+  const passHeadline = brandName || dealTitle || 'VIP Pass'
+  const showDealTitle = Boolean(dealTitle) && dealTitle !== passHeadline
+  const passTitle = [brandName, dealTitle].filter(Boolean).join(' · ')
+  const passCode = `#${shortOrderId(orderId)}`
+
+  const sharePass = async () => {
+    const text = ['VIP PASS', passTitle, gift, passCode].filter(Boolean).join('\n')
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title: 'VIP Pass', text })
+        return
+      } catch (shareError: any) {
+        if (shareError?.name === 'AbortError') return
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(passCode)
+      setCopied(true)
+    } catch {
+      setCopied(false)
+    }
+  }
 
   return (
     <Shell>
-      <div className="rounded-[28px] border border-emerald-400/25 bg-emerald-500/10 px-6 py-7">
-        <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300">დადასტურებულია</p>
-        <h1 className="mt-2 text-3xl font-black">შეკვეთა მიღებულია</h1>
-        <p className="mt-2 text-sm text-white/60">Order #{shortOrderId(orderId)}</p>
-        <p className="mt-2 text-sm text-white/80">
-          შეკვეთა უკვე გადაეცა {brandName ? `${brandName}-ს` : 'ბრენდს'}
-        </p>
+      <div className="relative overflow-hidden rounded-2xl border border-[#C9B087]/35 bg-gradient-to-br from-[#1C0D11] via-[#121011] to-[#0D0B0C] px-7 py-8 shadow-[inset_0_1px_0_rgba(242,239,233,0.08)]">
+        <div className="pointer-events-none absolute inset-2 rounded-xl border border-[#C9B087]/15" />
+        <BrandMonogram className="pointer-events-none absolute top-4 right-4 h-16 w-16 opacity-[0.06]" />
+        <div className="relative">
+          <p className="font-sans text-[11px] tracking-[0.2em] text-[#C9B087]">VIP PASS · დადასტურებულია</p>
+          <h1 className="font-editorial mt-3 text-3xl font-medium leading-[1.15] text-[#F2EFE9]">
+            {passHeadline}
+          </h1>
+          {showDealTitle && (
+            <p className="mt-2 font-sans text-sm leading-snug text-[#F2EFE9]/75">
+              {dealTitle}
+            </p>
+          )}
 
-        <dl className="mt-6 space-y-3 text-sm">
-          <div className="flex items-start justify-between gap-4">
-            <dt className="text-white/50">ბრენდი</dt>
-            <dd className="text-right font-bold">{receipt?.brand_name || '—'}</dd>
-          </div>
-          <div className="flex items-start justify-between gap-4">
-            <dt className="text-white/50">ბანდლი</dt>
-            <dd className="text-right font-bold">{receipt?.deal_title || '—'}</dd>
-          </div>
-          <div className="flex items-start justify-between gap-4">
-            <dt className="text-white/50">გადახდილი</dt>
-            <dd className="text-right font-black">{formatGel(Number(receipt?.final_amount || 0))} ₾</dd>
-          </div>
-          <div className="flex items-start justify-between gap-4">
-            <dt className="text-white/50">საჩუქარი</dt>
-            <dd className="text-right font-bold">{receipt?.gift_description || '—'}</dd>
-          </div>
-          {showCity && (
-            <div className="flex items-start justify-between gap-4">
-              <dt className="text-white/50">ქალაქი</dt>
-              <dd className="text-right font-bold">{customerCity}</dd>
+          {gift && (
+            <div className="mt-5 rounded-lg border border-[#C9B087]/25 bg-gradient-to-r from-[#4A1420]/30 to-[#C9B087]/[0.06] px-4 py-3">
+              <p className="font-sans text-[11px] tracking-[0.14em] text-[#C9B087]">VIP პრივილეგია</p>
+              <p className="mt-1 font-sans text-sm leading-snug text-[#F2EFE9]">{gift}</p>
             </div>
           )}
-          {maskedPhone && (
-            <div className="flex items-start justify-between gap-4">
-              <dt className="text-white/50">ტელეფონი</dt>
-              <dd className="text-right font-bold tracking-wider">{maskedPhone}</dd>
-            </div>
+
+          <p className="mt-6 font-mono text-2xl tracking-[0.18em] text-[#C9B087]">{passCode}</p>
+
+          <button
+            type="button"
+            onClick={sharePass}
+            className="mt-6 w-full rounded-lg bg-[#F2EFE9] py-4 font-sans text-xs font-semibold uppercase tracking-[0.14em] text-[#090808] transition-colors hover:bg-[#E7DEC8]"
+          >
+            {copied ? 'კოდი დაკოპირდა' : 'VIP Pass-ის გაზიარება'}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 w-full border-t border-white/[0.08] px-1 py-5 text-center">
+        <p className="font-sans text-sm text-[#8C8580]">
+          გადახდილია <span className="font-editorial text-lg font-medium text-[#F2EFE9]">{formatGel(Number(receipt?.final_amount || 0))} ₾</span> · საქართველოს ბანკი
+        </p>
+        {showCity && (
+          <p className="mt-2 font-sans text-xs text-[#8C8580]">{customerCity}</p>
+        )}
+        <p className="mt-2 font-sans text-xs leading-relaxed text-[#8C8580]">
+          {maskedPhone ? (
+            <>
+              მალე დაგიკავშირდებიან WhatsApp-ზე{' '}
+              <span className="whitespace-nowrap">({maskedPhone})</span>
+            </>
+          ) : (
+            'მალე დაგიკავშირდებიან WhatsApp-ზე'
           )}
-        </dl>
-
-        <p className="mt-4 text-sm leading-relaxed text-white/70">
-          {maskedPhone
-            ? `მალე დაგიკავშირდებიან WhatsApp-ზე (${maskedPhone})`
-            : 'მალე დაგიკავშირდებიან WhatsApp-ზე'}
         </p>
-        <p className="mt-2 text-xs text-white/40">შეინახე ამ ეკრანის სქრინშოთი შეკვეთის ნომრით</p>
-        <p className="mt-5 text-xs leading-relaxed text-white/55">
-          გადახდა დაცულია InfluX-ის მიერ — ნებისმიერ კითხვაზე მოგვწერე WhatsApp-ში
-        </p>
-
         <a
           href={whatsappHref(orderId)}
-          className="mt-3 flex w-full items-center justify-center rounded-2xl bg-[#25D366] py-4 text-base font-black text-black"
+          className="mt-4 flex w-full items-center justify-center rounded-lg border border-white/15 py-3.5 font-sans text-xs font-medium uppercase tracking-[0.14em] text-[#F2EFE9] transition-colors hover:bg-white/[0.04]"
         >
-          WhatsApp მხარდაჭერა
+          WhatsApp კონსიერჟი
         </a>
       </div>
     </Shell>
@@ -291,7 +315,7 @@ function SuccessContent() {
 
 export default function PaymentSuccess() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#010201]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[#090808]" />}>
       <SuccessContent />
     </Suspense>
   )

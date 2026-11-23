@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
+import { motion } from 'framer-motion'
+import { BrandMonogram } from '@/components/BrandMark'
 
 function buyerDealMark(deal: any): { kind: 'discount'; pct: number } | { kind: 'gift'; text: string } | null {
   const limit = Number(deal?.stock_limit || 0)
@@ -57,77 +58,41 @@ export function DealValueMark({ deal }: { deal: any }) {
   )
 }
 
-function GridDealCard({ deal, onDealClick }: { deal: any; onDealClick?: (deal: any) => void }) {
-  const stopCardFlip = (e: React.SyntheticEvent) => {
-    e.stopPropagation()
-  }
+function formatPassPrice(price: unknown) {
+  const value = Number(price)
+  if (!Number.isFinite(value) || value <= 0) return ''
+  const amount = Number.isInteger(value) ? String(value) : value.toFixed(2)
+  return `${amount} ₾`
+}
+
+function DealRow({ deal, onDealClick }: { deal: any; onDealClick?: (deal: any) => void }) {
+  const perk = (typeof deal?.gift_description === 'string' && deal.gift_description.trim()) || 'VIP წვდომა'
+  const priceLabel = formatPassPrice(deal?.price)
+  const logo = typeof deal?.logo === 'string' ? deal.logo : ''
 
   return (
-    <motion.div 
-      className="relative cursor-pointer h-[240px] group/deal"
-      style={{ transformStyle: 'preserve-3d', perspective: "1000px" }}
-      whileTap={{ scale: 0.97 }}
-      onClick={(e) => {
-        e.stopPropagation()
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation()
         onDealClick?.(deal)
       }}
-      onDoubleClick={stopCardFlip}
-      onPointerDown={stopCardFlip}
-      onMouseDown={stopCardFlip}
+      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[#4A1420]/20"
     >
-      {/* 💠 FRONT SIDE */}
-      <div 
-        className="absolute inset-0 bg-[#020502] border border-white/10 rounded-[35px] p-5 flex flex-col justify-between shadow-inner relative overflow-hidden transition-colors group-hover/deal:border-emerald-500/40 group-active/deal:bg-white/[0.03]" 
-        style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'translateZ(1px)' }}
-      >
-        <div className="flex flex-col items-center gap-2 relative z-10 text-center">
-            <div className="h-12 w-12 rounded-2xl bg-white/[0.03] border-2 border-white/10 flex items-center justify-center overflow-hidden">
-               {deal.logo?.startsWith('http') 
-                  ? <img src={deal.logo} alt="brand" className="h-full w-full object-cover" /> 
-                  : <span className="text-xl">{deal.logo || '💎'}</span>}
-            </div>
-            <h3 className="text-[8px] text-white tracking-widest truncate w-full opacity-60 uppercase font-black italic mt-1">
-              {deal.brand}
-            </h3>
-        </div>
-        
-        <DealValueMark deal={deal} />
-        
-        <div className="flex items-center justify-end relative z-10">
-          <span className="text-[7px] text-emerald-500/70 group-hover/deal:text-emerald-400 tracking-[0.28em] uppercase font-black italic transition-colors">
-            PAY →
-          </span>
-        </div>
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden">
+        {logo.startsWith('http')
+          ? <img src={logo} alt="" className="h-full w-full object-cover" />
+          : <span className="font-editorial text-lg text-[#C9B087]">{logo || '◆'}</span>}
       </div>
-
-      {/* 💠 BACK SIDE (Passport Intel Style) */}
-      <div 
-        className="absolute inset-0 bg-black border border-emerald-500/20 rounded-[35px] p-5 flex flex-col justify-between shadow-inner pointer-events-none" 
-        style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg) translateZ(1px)' }}
-      >
-        <div className="space-y-3 font-black italic uppercase leading-none">
-          <h4 className="text-[8px] text-emerald-500 tracking-[0.4em] border-b border-white/10 pb-2 text-center">Brand Intel</h4>
-          
-          <div className="space-y-2">
-            <div>
-              <span className="text-[6px] text-gray-600 tracking-widest block mb-0.5">Sector</span>
-              <p className="text-[10px] text-white truncate">{deal.intel?.type || 'Active Node'}</p>
-            </div>
-            <div>
-              <span className="text-[6px] text-gray-600 tracking-widest block mb-0.5">Location</span>
-              <p className="text-[10px] text-white truncate">{deal.intel?.location || 'Digital'}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white/[0.04] border border-white/10 rounded-[15px] p-3 shadow-inner">
-          <span className="text-[5px] text-emerald-500 tracking-[0.3em] block mb-1 font-black uppercase">Message</span>
-          <p className="text-[9px] text-white leading-tight italic font-black uppercase line-clamp-3">
-            {deal.backIntelPhone || deal.intel?.phone || 'Classified.'}
-          </p>
-        </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-editorial text-base font-medium text-[#F2EFE9]">{deal?.brand || 'VIP'}</p>
+        <p className="mt-0.5 truncate font-sans text-xs tracking-[0.04em] text-[#C9B087]">{perk}</p>
       </div>
-    </motion.div>
+      <div className="flex shrink-0 items-center gap-2 font-editorial text-sm text-[#F2EFE9]">
+        {priceLabel && <span>{priceLabel}</span>}
+        <span className="font-sans text-[#8C8580]">→</span>
+      </div>
+    </button>
   )
 }
 
@@ -141,89 +106,103 @@ interface InfluXCardProps {
   onDealClick?: (deal: any) => void;
 }
 
-export default function InfluXCard({ profile, liveDeals = [], deal, children, disableRotation = false, onFlip, onDealClick }: InfluXCardProps) {
+export default function InfluXCard({ profile, liveDeals = [], deal, children, onFlip, onDealClick }: InfluXCardProps) {
   const [isFlipped, setIsFlipped] = useState(false)
-  const x = useMotionValue(0), y = useMotionValue(0)
-  const mouseXSpring = useSpring(x, { stiffness: 60, damping: 50 }), mouseYSpring = useSpring(y, { stiffness: 60, damping: 50 })
-  
-  const rotateX = useTransform(mouseYSpring, [-300, 300], disableRotation ? [0, 0] : [5, -5])
-  const rotateY = useTransform(mouseXSpring, [-300, 300], disableRotation ? [0, 0] : [-5, 5])
 
   if (!profile && !deal) return null
 
-  const nameParts = (profile?.full_name || deal?.brands?.name || 'SYNC NODE').split(' ');
-  const firstName = nameParts[0];
-  const lastName = nameParts.slice(1).join(' ');
+  const displayName = (profile?.full_name || deal?.brands?.name || '').trim()
+
+  const handleFlip = () => {
+    const opening = !isFlipped
+    setIsFlipped(opening)
+    if (opening) onFlip?.()
+  }
 
   return (
-    <div className="relative w-full flex flex-col items-center">
-      <div className="relative w-full" 
-           onMouseMove={(e) => { if(!disableRotation) { const rect = e.currentTarget.getBoundingClientRect(); x.set(e.clientX - (rect.left + rect.width / 2)); y.set(e.clientY - (rect.top + rect.height / 2)) } }} 
-           onMouseLeave={() => { x.set(0); y.set(0) }} 
-           onDoubleClick={() => {
-             const opening = !isFlipped
-             setIsFlipped(opening)
-             if (opening) onFlip?.()
-           }}>
-        
-        <motion.div 
-          style={{ rotateX: isFlipped ? 0 : rotateX, rotateY: isFlipped ? 180 : rotateY, transformStyle: "preserve-3d", perspective: "2000px", WebkitTransformStyle: "preserve-3d" }} 
-          animate={{ rotateY: isFlipped ? 180 : 0 }} 
-          transition={{ duration: 1.1, ease: [0.19, 1, 0.22, 1] }} 
-          className="w-full aspect-[1/1.6] relative cursor-pointer"
+    <div className="relative flex w-full flex-col items-center">
+      <div className="pointer-events-none absolute -inset-x-8 -top-16 bottom-6 bg-[radial-gradient(ellipse_at_top,rgba(92,24,39,0.28),transparent_62%)]" />
+      <div className="relative w-full" onClick={handleFlip}>
+        <motion.div
+          animate={{ rotateY: isFlipped ? 180 : 0 }}
+          transition={{ duration: 0.7, ease: [0.19, 1, 0.22, 1] }}
+          style={{ transformStyle: 'preserve-3d', WebkitTransformStyle: 'preserve-3d' }}
+          className="relative aspect-[1/1.6] w-full cursor-pointer"
         >
-          {/* === FRONT === */}
-          <div 
-            className="absolute inset-0 bg-[#040d08]/98 border-2 border-emerald-950/30 rounded-[45px] p-5 pt-6 flex flex-col shadow-2xl overflow-hidden" 
-            style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "translateZ(1px)" }}
+          <div
+            className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#121011] shadow-[inset_0_1px_0_rgba(242,239,233,0.08),0_0_0_1px_rgba(201,176,135,0.14),0_28px_70px_-24px_rgba(92,24,39,0.7)]"
+            style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'translateZ(1px)' }}
           >
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#10b98110,transparent_75%)] pointer-events-none" />
-              
-              <div className="w-full relative flex flex-col items-center z-10">
-                {profile?.avatar_url && (
-                  <motion.img 
-                    src={profile.avatar_url} 
-                    className="w-[96%] aspect-square object-cover rounded-[32px] filter brightness-105 drop-shadow-[0_0_60px_#10b98144]" 
-                    animate={{ y: [0, -6, 0] }} 
-                    transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }} 
-                  />
-                )}
-                
-                <h3 className="font-black italic uppercase text-white tracking-tighter leading-[0.85] text-glow text-center w-full px-2 mt-7 flex flex-col">
-                  <span className="text-[34px]">{firstName}</span>
-                  {lastName && <span className="text-[34px]">{lastName}</span>}
-                </h3>
-              </div>
-
-              <div className="absolute bottom-[90px] left-0 w-full flex justify-center z-20 pointer-events-none">
-                <p className="text-[10px] text-white/50 tracking-[0.4em] font-black uppercase animate-pulse">
-                  Double Tap to Flip
-                </p>
-              </div>
-
-              {children && (
-                <div className="absolute bottom-5 left-0 w-full flex justify-center z-30">
-                  {children}
-                </div>
+            <div className="relative min-h-0 flex-1">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-[#1C0D11]" />
               )}
-          </div>
-
-          {/* === BACK === */}
-          <div 
-            className="absolute inset-0 bg-[#010201] border-2 border-white/10 rounded-[45px] overflow-hidden" 
-            style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg) translateZ(1px)" }}
-          >
-            <div className="w-full h-full p-6 pt-8 overflow-y-auto scrollbar-hide bg-[radial-gradient(circle_at_0%_0%,#ffffff03,transparent_60%)]">
-              <div className="grid grid-cols-2 gap-3 pb-4">
-                {liveDeals.length > 0 ? liveDeals.map((d) => (
-                  <GridDealCard key={d.id} deal={d} onDealClick={onDealClick} />
-                )) : (
-                  <div className="col-span-2 text-center py-20 opacity-20 font-black italic uppercase text-[10px] tracking-widest">
-                    No Deals Linked
-                  </div>
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[52%] bg-gradient-to-t from-[#121011] via-[#121011]/88 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 px-5 pb-2 text-center">
+                {displayName && (
+                  <h3 className="font-editorial text-3xl font-medium capitalize leading-tight text-[#F2EFE9]">
+                    {displayName}
+                  </h3>
                 )}
+                <div className="mt-3 flex flex-col items-center">
+                  <BrandMonogram className="h-5 w-5" />
+                  <span className="mt-2 h-px w-10 bg-[#C9B087]/50" />
+                  <p className="mt-2 font-sans text-[10px] tracking-[0.18em] text-[#C9B087]">
+                    EXCLUSIVE ACCESS · {liveDeals.length} VIP PASS
+                  </p>
+                </div>
               </div>
             </div>
+
+            <div className="px-4 pb-4">
+              <button
+                type="button"
+                className="w-full rounded-lg bg-[#F2EFE9] py-4 font-sans text-xs font-semibold uppercase tracking-[0.14em] text-[#090808] transition-colors hover:bg-[#E7DEC8]"
+              >
+                წვდომის გახსნა
+              </button>
+              {children}
+            </div>
+            <div className="pointer-events-none absolute inset-2.5 rounded-xl border border-[#C9B087]/15" />
+          </div>
+
+          <div
+            className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#121011] shadow-[inset_0_1px_0_rgba(242,239,233,0.08),0_0_0_1px_rgba(201,176,135,0.14)]"
+            style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg) translateZ(1px)' }}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-4">
+              <p className="min-w-0 truncate font-editorial text-lg font-medium capitalize text-[#F2EFE9]">{displayName}</p>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setIsFlipped(false)
+                }}
+                className="shrink-0 font-sans text-[11px] tracking-[0.12em] text-[#8C8580] transition-colors hover:text-[#F2EFE9]"
+              >
+                ← უკან
+              </button>
+            </div>
+            <div className="scrollbar-hide flex-1 overflow-y-auto">
+              {liveDeals.length > 0 ? (
+                <div className="divide-y divide-white/[0.07]">
+                  {liveDeals.map((item) => (
+                    <DealRow key={item.id} deal={item} onDealClick={onDealClick} />
+                  ))}
+                </div>
+              ) : (
+                <p className="py-16 text-center font-sans text-sm text-[#8C8580]">
+                  VIP წვდომა ჯერ არ არის
+                </p>
+              )}
+            </div>
+            <div className="pointer-events-none absolute inset-2.5 rounded-xl border border-[#C9B087]/15" />
           </div>
         </motion.div>
       </div>

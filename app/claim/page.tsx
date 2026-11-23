@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import BrandMark from '@/components/BrandMark'
 import InfluXCard from '@/components/InfluXCard'
 import { trackTokenEvent } from '@/lib/trackTokenEvent'
 
@@ -70,7 +71,7 @@ function ClaimContent() {
           brandId: row.brand_id || deal?.brand_id || null,
           partnershipId: row.id || null,
           dealId,
-          brand: deal?.title || 'MATRIX NODE',
+          brand: deal?.title || 'VIP',
           offer: formatOffer(deal),
           logo: deal?.image_url || deal?.logo || '💎',
           price: deal?.price ?? null,
@@ -79,7 +80,7 @@ function ClaimContent() {
           stock_limit: deal?.stock_limit ?? null,
           stock_sold: deal?.stock_sold ?? null,
           is_active: deal?.is_active ?? null,
-          backIntelPhone: deal?.description || deal?.intel?.phone || 'Secret Node',
+          backIntelPhone: deal?.description || deal?.intel?.phone || '',
           intel: deal?.intel || {},
         }]
       }))
@@ -92,24 +93,19 @@ function ClaimContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#010201] text-emerald-500 font-black uppercase tracking-[0.5em] animate-pulse flex items-center justify-center italic">
-        Intercepting Signal...
+      <div className="flex min-h-screen items-center justify-center bg-[#090808]">
+        <div className="h-8 w-8 animate-spin rounded-full border border-[#C9B087]/25 border-t-[#C9B087]" />
       </div>
     )
   }
 
   return (
-    <main className="min-h-screen bg-[#010201] flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#10b98108,transparent_70%)] pointer-events-none" />
-
-      <div className="z-10 flex flex-col items-center w-full max-w-[340px]">
-        <img
-          src="/influx-logo.png"
-          alt="InfluX"
-          className="mb-4 h-6 w-auto max-w-full object-contain"
-        />
+    <main className="relative flex min-h-screen flex-col items-center overflow-hidden bg-[#090808] px-6 py-10">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(92,24,39,0.28),transparent_62%)]" />
+      <div className="relative my-auto flex w-full max-w-[380px] flex-col items-center">
+        <BrandMark size="sm" className="mb-6" />
         {!profile?.id ? (
-          <p className="text-center text-[11px] font-black uppercase tracking-[0.28em] text-white/50 italic">
+          <p className="text-center font-sans text-sm text-[#8C8580]">
             ბმული არასწორია
           </p>
         ) : (

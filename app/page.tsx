@@ -1,219 +1,143 @@
 'use client'
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import BrandMark from '@/components/BrandMark'
 import Footer from '@/components/Footer'
-
-const LanguageCube = ({ lang, setLang }: { lang: 'ka' | 'en', setLang: any }) => {
-  return (
-    <div 
-      className="relative h-10 w-10 cursor-pointer pointer-events-auto select-none"
-      onClick={() => setLang(lang === 'en' ? 'ka' : 'en')}
-      style={{ perspective: '1000px' }}
-    >
-      <motion.div
-        animate={{ rotateX: lang === 'en' ? 0 : -90 }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        className="w-full h-full relative"
-        style={{ transformStyle: 'preserve-3d' }}
-      >
-        <div className="absolute inset-0 bg-emerald-500 text-black flex items-center justify-center rounded-sm backface-hidden font-black text-[10px]">EN</div>
-        <div 
-          className="absolute inset-0 bg-white text-black flex items-center justify-center rounded-sm backface-hidden font-black text-[10px]"
-          style={{ transform: 'rotateX(90deg) translateZ(20px)' }}
-        >GE</div>
-      </motion.div>
-    </div>
-  )
-}
 
 const translations = {
   ka: {
-    heroTag: "ინფლუენსერ მარკეტინგის მომავალი",
-    cta: "შემოუერთდი სისტემას",
-    sections: [
-      { id: 'influencer', title: 'Influencers', color: '#10b981', text: 'ინფლუენსერები შეძლებენ უკეთ მოახდინონ საკუთარი გავლენის მონეტიზაცია - აიღონ საკომისიო ყოველი ტრანზაქციიდან.' },
-      { id: 'brand', title: 'Brands', color: '#3b82f6', text: 'ბრენდები შეძლებენ უფასოდ დაიწყონ თანამშრომლობა და გადაუხადონ საკომისიო მხოლოდ გაყიდვებიდან.' },
-      { id: 'user', title: 'Users', color: '#ffffff', text: 'გამომწერები მიიღებენ რეალურ სარგებელს და დაზოგავენ თანხას მათ საყვარელ ბრენდებთან.' }
-    ]
+    headline: 'ექსკლუზიური წვდომა. 15-წამიანი გადახდა.',
+    subtitle: 'პრემიუმ ესთეტიკური კლინიკები, ბუტიკ-სასტუმროები და შერჩეული კრეატორები — კუპონებისა და ფასდაკლებების გარეშე, მხოლოდ VIP პრივილეგიებით.',
+    primary: 'პარტნიორობის მოთხოვნა',
+    secondary: 'შესვლა',
+    cards: [
+      {
+        title: 'ბიზნესებისთვის',
+        text: '0 ₾ წინასწარი ბიუჯეტი. წინასწარ გადახდილი VIP ჯავშნები აპარატულ სერვისებსა და სასტუმროებზე, ავტომატური საბანკო გაყოფით.',
+      },
+      {
+        title: 'კრეატორებისთვის',
+        text: 'მხოლოდ გადამოწმებული პრემიუმ პარტნიორები. 15% მყისიერი ანაზღაურება ყოველი გადახდილი VIP Pass-იდან.',
+      },
+      {
+        title: 'სტუმრებისთვის',
+        text: 'დახურული პრივილეგიები, 60-დღიანი ღია თარიღი და 15-წამიანი Apple Pay / Google Pay გადახდა.',
+      },
+    ],
   },
   en: {
-    heroTag: "The Future of Influencer Marketing",
-    cta: "JOIN THE SYSTEM",
-    sections: [
-      { id: 'influencer', title: 'Influencers', color: '#10b981', text: 'Influencers can effectively convert their impact into revenue, earning commissions from their followers\' transactions.' },
-      { id: 'brand', title: 'Brands', color: '#3b82f6', text: 'Brands can start collaborating with influencers for free and pay commissions only on generated sales.' },
-      { id: 'user', title: 'Users', color: '#ffffff', text: 'Followers receive real benefits from their favorite creators and save money on daily essentials.' }
-    ]
-  }
+    headline: 'Exclusive Access. 15-Second Checkout.',
+    subtitle: 'Curated aesthetic clinics, boutique hotels, and trusted creators — no coupons, no discounts, only private VIP perks.',
+    primary: 'Request Access',
+    secondary: 'Sign In',
+    cards: [
+      {
+        title: 'For Venues',
+        text: 'No upfront budget. Prepaid VIP reservations for apparatus treatments and hotels, settled with an automatic bank split.',
+      },
+      {
+        title: 'For Creators',
+        text: 'Verified premium partners only. 15% paid instantly on every completed VIP Pass.',
+      },
+      {
+        title: 'For Guests',
+        text: 'Private privileges, a 60-day open date, and 15-second Apple Pay / Google Pay checkout.',
+      },
+    ],
+  },
 }
 
-export default function NeuralInterface() {
-  const [lang, setLang] = useState<'ka' | 'en'>('en')
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [revealedChannel, setRevealedChannel] = useState<'whatsapp' | 'email' | null>(null)
-  const t = translations[lang]
-  const router = useRouter()
+const numerals = ['01', '02', '03']
 
-  const handleContactClick = (type: 'whatsapp' | 'email', link: string) => {
-    if (revealedChannel === type) {
-      window.open(link, '_blank');
-    } else {
-      setRevealedChannel(type);
-    }
-  }
+export default function HomePage() {
+  const [lang, setLang] = useState<'ka' | 'en'>('ka')
+  const t = translations[lang]
+
+  useEffect(() => {
+    document.documentElement.lang = lang
+  }, [lang])
 
   return (
-    <main className="min-h-screen bg-[#000000] text-white font-sans overflow-x-hidden selection:bg-emerald-500 selection:text-black italic uppercase font-black">
-      
-      {/* 🛰️ Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-[100] h-24 flex items-center justify-between px-6 md:px-10 bg-transparent">
+    <main className="min-h-screen overflow-x-hidden bg-[#090808] text-[#F2EFE9] selection:bg-[#C9B087]/30 selection:text-[#F2EFE9]">
+      <nav className="fixed top-0 right-0 left-0 z-[100] flex h-16 items-center justify-between border-b border-white/[0.08] bg-[#090808]/80 px-6 backdrop-blur-md md:px-10">
         <button
           type="button"
           aria-label="InfluX"
           className="cursor-pointer border-0 bg-transparent p-0"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         >
-          <img
-            src="/influx-logo.png"
-            alt="InfluX"
-            className="h-6 w-auto object-contain sm:h-7"
-          />
+          <BrandMark size="sm" />
         </button>
-        <LanguageCube lang={lang} setLang={setLang} />
+        <button
+          type="button"
+          onClick={() => setLang(lang === 'ka' ? 'en' : 'ka')}
+          className="rounded-lg border border-white/[0.08] px-3 py-1.5 font-sans text-[11px] tracking-[0.16em]"
+          aria-label={lang === 'ka' ? 'English' : 'ქართული'}
+        >
+          <span className={lang === 'ka' ? 'text-[#F2EFE9]' : 'text-[#8C8580]'}>KA</span>
+          <span className="mx-1.5 text-white/25">/</span>
+          <span className={lang === 'en' ? 'text-[#F2EFE9]' : 'text-[#8C8580]'}>EN</span>
+        </button>
       </nav>
 
-      {/* 🌪️ HERO SECTION */}
-      <section className="h-screen flex flex-col items-center justify-center p-6 text-center relative">
-        <div className="z-10 w-full px-2">
-          <img
-            src="/influx-logo.png"
-            alt="InfluX"
-            className="mx-auto h-14 w-auto max-w-full object-contain sm:h-20 md:h-28 lg:h-36"
-          />
-        </div>
-        
-        <div className="mt-8 relative group p-1 overflow-hidden rounded-full">
-          <motion.div className="absolute inset-0 rounded-full z-0" style={{ background: "conic-gradient(from 0deg, #10b981, transparent 40%)" }} animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }} />
-          <div className="absolute inset-[2px] rounded-full bg-black z-1" />
-          <p className="relative z-10 text-[10px] md:text-xl tracking-tight text-white p-3 px-8 md:px-12 opacity-60 font-medium lowercase italic">{t.heroTag}</p>
-        </div>
-
-        {/* 🔘 ELEGANT HERO BUTTONS */}
-        <div className="mt-12 flex flex-col md:flex-row gap-4 z-20 w-full max-w-xs md:max-w-xl px-6">
-          <motion.button 
-            whileHover={{ scale: 1.03, boxShadow: "0 0 30px rgba(255,255,255,0.2)" }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => router.push('/signup')}
-            className="flex-1 py-5 bg-white text-black text-sm md:text-base tracking-tighter rounded-full transition-all shadow-xl font-[1000]"
-          >
-            {t.cta}
-          </motion.button>
+      <section className="relative flex min-h-screen flex-col items-center justify-center px-6 pb-16 pt-24 text-center">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[72vh] bg-[radial-gradient(ellipse_at_top,rgba(92,24,39,0.28),transparent_62%)]" />
+        <div className="relative flex flex-col items-center">
+          <BrandMark size="lg" />
+          <span className="mt-8 h-px w-12 bg-[#C9B087]/50" />
+          <p className="mt-5 font-sans text-[11px] tracking-[0.22em] text-[#C9B087]">
+            EXCLUSIVE ACCESS · HIGH-TICKET SERVICES
+          </p>
+          <h1 className="font-editorial mt-5 max-w-3xl text-4xl font-normal leading-[1.15] text-[#F2EFE9] sm:text-5xl">
+            {t.headline}
+          </h1>
+          <p className="mt-5 max-w-xl font-sans text-sm leading-relaxed text-[#8C8580] sm:text-base">
+            {t.subtitle}
+          </p>
+          <div className="mt-10 flex w-full max-w-sm flex-col gap-3 lg:max-w-2xl lg:flex-row lg:justify-center">
+            <a
+              href="https://wa.me/995500050607"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 rounded-lg bg-[#F2EFE9] px-6 py-4 text-center font-sans text-xs font-semibold uppercase tracking-[0.14em] text-[#090808] transition-colors hover:bg-[#E7DEC8]"
+            >
+              {t.primary}
+            </a>
+            <Link
+              href="/signup"
+              className="flex-1 rounded-lg border border-white/15 px-6 py-4 text-center font-sans text-xs font-medium uppercase tracking-[0.14em] text-[#F2EFE9] transition-colors hover:bg-white/[0.04]"
+            >
+              {t.secondary}
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* 🧩 HIGH-VISIBILITY MODULES */}
-      <section className="max-w-6xl mx-auto px-6 pb-40 space-y-6">
-        {t.sections.map((section) => (
-          <motion.div 
-            key={section.id} layout
-            onClick={() => setExpanded(expanded === section.id ? null : section.id)}
-            className={`cursor-pointer p-10 md:p-16 rounded-[45px] border transition-all duration-500 ${
-              expanded === section.id 
-              ? 'bg-white/[0.07] border-white/20' 
-              : 'bg-black border-white/5 hover:border-white/10'
-            }`}
-          >
-            <div className="flex justify-between items-center">
-              <h3 
-                className="text-5xl md:text-9xl tracking-tighter transition-all duration-500"
-                style={{ color: expanded === section.id ? section.color : 'rgba(255,255,255,0.4)' }}
-              >
-                {section.title}
-              </h3>
-              <motion.div 
-                animate={{ scale: expanded === section.id ? [1, 1.4, 1] : 1, opacity: expanded === section.id ? 1 : 0.3 }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                className="h-4 w-4 rounded-full"
-                style={{ backgroundColor: section.color, boxShadow: `0 0 20px ${section.color}` }}
-              />
-            </div>
-
-            <AnimatePresence>
-              {expanded === section.id && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                  <p className="pt-16 text-2xl md:text-4xl leading-tight text-white max-w-5xl tracking-tight italic">
-                    {section.text}
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
+      <section className="mx-auto max-w-3xl border-b border-white/[0.08] px-6 pb-8">
+        {t.cards.map((card, index) => (
+          <article key={card.title} className="border-t border-white/[0.08] py-9">
+            <p className="font-editorial text-sm italic text-[#C9B087]">{numerals[index]}</p>
+            <h2 className="font-editorial mt-3 text-2xl font-medium text-[#F2EFE9] sm:text-3xl">{card.title}</h2>
+            <p className="mt-3 max-w-xl font-sans text-sm leading-relaxed text-[#8C8580]">{card.text}</p>
+          </article>
         ))}
       </section>
 
-      {/* 📞 TWO-STEP CONTACT TERMINAL */}
-      <section className="max-w-4xl mx-auto px-6 pb-20 text-center relative z-10">
-        <div className="flex justify-center items-center gap-10 md:gap-16 mb-10">
-          
-          {/* WhatsApp Button */}
-          <div className="flex flex-col items-center gap-4">
-            <button 
-              onClick={() => handleContactClick('whatsapp', 'https://wa.me/995500050607')}
-              className={`group w-20 h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center transition-all duration-500 shadow-xl ${revealedChannel === 'whatsapp' ? 'bg-emerald-500 scale-110' : 'bg-white hover:bg-emerald-500'}`}
-            >
-              <svg className={`w-8 h-8 md:w-10 md:h-10 transition-transform ${revealedChannel === 'whatsapp' ? 'text-white' : 'text-black group-hover:rotate-12'}`} viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72.937 3.659 1.431 5.623 1.432h.006c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-              </svg>
-            </button>
-          </div>
-
-          {/* Email Button */}
-          <div className="flex flex-col items-center gap-4">
-            <button 
-              onClick={() => handleContactClick('email', 'mailto:sandro@influxapp.io')}
-              className={`group w-20 h-20 md:w-24 md:h-24 rounded-full border flex items-center justify-center transition-all duration-500 shadow-xl ${revealedChannel === 'email' ? 'bg-white border-white scale-110' : 'bg-black border-white/10 hover:border-white'}`}
-            >
-              <svg className={`w-8 h-8 md:w-10 md:h-10 transition-transform ${revealedChannel === 'email' ? 'text-black' : 'text-white group-hover:-translate-y-1'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* 📟 DYNAMIC INFO DISPLAY */}
-        <div className="h-10">
-          <AnimatePresence mode="wait">
-            {revealedChannel ? (
-              <motion.p 
-                key={revealedChannel}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="text-lg md:text-2xl font-black italic tracking-tighter text-white"
-              >
-                {revealedChannel === 'whatsapp' ? (
-                  <a
-                    href="https://wa.me/995500050607"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    500 05 06 07
-                  </a>
-                ) : 'sandro@influxapp.io'}
-              </motion.p>
-            ) : (
-              <motion.p 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 0.2 }} 
-                className="text-[8px] tracking-[0.5em] text-gray-500 font-black uppercase italic"
-              >
-                TAP ONCE TO REVEAL CHANNEL • TWICE TO CONNECT
-              </motion.p>
-            )}
-          </AnimatePresence>
-        </div>
+      <section className="mx-auto flex max-w-3xl flex-col items-center justify-center gap-8 px-6 py-16 sm:flex-row sm:gap-16">
+        <a
+          href="https://wa.me/995500050607"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-center"
+        >
+          <span className="block font-sans text-[11px] tracking-[0.16em] text-[#8C8580]">WhatsApp</span>
+          <span className="mt-1 block font-sans text-base text-[#F2EFE9]">500 05 06 07</span>
+        </a>
+        <a href="mailto:sandro@influxapp.io" className="text-center">
+          <span className="block font-sans text-[11px] tracking-[0.16em] text-[#8C8580]">Email</span>
+          <span className="mt-1 block font-sans text-base text-[#F2EFE9]">sandro@influxapp.io</span>
+        </a>
       </section>
 
       <Footer />
